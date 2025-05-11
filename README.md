@@ -53,7 +53,7 @@ npm run dev
 
 4. Build the application 构建应用
 ```bash
-npm run electron:build
+npm run build
 ```
 
 ## Project Structure 项目结构
