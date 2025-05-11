@@ -507,6 +507,8 @@ const paymentRules = {
   payment_type: [{ required: true, message: '请选择费用类别', trigger: 'change' }]
 };
 
+const deletedImages = ref([]);
+
 const filteredTenants = computed(() => {
   let filtered = store.tenants;
   
@@ -673,8 +675,11 @@ const showContractImages = async (tenant) => {
     currentContractImages.value = await store.getTenantContractImages(tenant.id);
     contractImageList.value = currentContractImages.value.map(img => ({
       name: img.name,
-      url: img.url
+      url: img.url,
+      id: img.id
     }));
+    // 清空删除列表
+    deletedImages.value = [];
     contractImagesVisible.value = true;
   } catch (error) {
     console.error('获取合同图片失败:', error);
@@ -714,31 +719,33 @@ const handleContractImageChange = (file) => {
 const handleContractImageRemove = (file) => {
   const index = contractImageList.value.findIndex(f => f.name === file.name);
   if (index !== -1) {
+    const removedFile = contractImageList.value[index];
+    // 如果是已保存的图片（有 id），添加到删除列表中
+    if (removedFile.id) {
+      deletedImages.value.push(removedFile);
+    }
     contractImageList.value.splice(index, 1);
   }
 };
 
 const saveContractImages = async () => {
-  if (contractImageList.value.length === 0) {
+  if (contractImageList.value.length === 0 && deletedImages.value.length === 0) {
     ElMessage.warning('请至少上传一张合同图片');
     return;
   }
 
   try {
-    // Create images directory if it doesn't exist
-    await window.electronAPI.ensureImagesDirectory();
-    
-    // Create a new array with only the necessary data
-    const imagesToSave = await Promise.all(contractImageList.value.map(async img => {
-      // Save the image to the images directory and get the file path
-      const savedPath = await window.electronAPI.saveContractImage(img.url, img.name);
-      return {
-        name: img.name,
-        url: savedPath
-      };
+    // 创建一个新数组，只包含需要的数据
+    const imagesToSave = contractImageList.value.map(img => ({
+      name: img.name,
+      url: img.url,
+      type: 'contract'
     }));
     
-    await store.updateTenantContractImages(currentTenantId.value, imagesToSave);
+    // 将要删除的图片ID列表传给后端
+    const deleteIds = deletedImages.value.map(img => img.id).filter(Boolean);
+    
+    await store.updateTenantContractImages(currentTenantId.value, imagesToSave, deleteIds);
     // 手动刷新一次列表
     await store.fetchTenants();
     ElMessage.success('合同图片保存成功');

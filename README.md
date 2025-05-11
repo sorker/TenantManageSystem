@@ -141,6 +141,8 @@ The following features are currently under development:
   - Payment history tracking 支付历史追踪
   - Property performance metrics 房屋表现指标
 
+- 前后端分离
+
 ## Contributing 贡献指南
 
 Contributions are welcome! Please feel free to submit a Pull Request.

@@ -60,9 +60,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSchedules: () => safeInvoke('get-schedules'),
   addSchedule: (schedule) => safeInvoke('add-schedule', schedule),
   updateSchedule: (schedule) => safeInvoke('update-schedule', schedule),
-  deleteSchedule: (id) => safeInvoke('delete-schedule', id),
-
-  // 图片管理
-  ensureImagesDirectory: () => safeInvoke('ensure-images-directory'),
-  saveContractImage: (imageData, fileName) => safeInvoke('save-contract-image', imageData, fileName)
+  deleteSchedule: (id) => safeInvoke('delete-schedule', id)
 }); 

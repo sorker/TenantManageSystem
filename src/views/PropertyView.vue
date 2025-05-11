@@ -79,6 +79,8 @@
               size="small" 
               type="danger" 
               @click="deleteProperty(row.id)"
+              :disabled="!!row.current_tenant_id"
+              :title="row.current_tenant_id ? '有租客记录的房间不能删除' : ''"
             >
               删除
             </el-button>
@@ -238,7 +240,12 @@ onMounted(async () => {
 const fetchProperties = async () => {
   loading.value = true;
   try {
-    properties.value = await window.electronAPI.getRooms();
+    const roomsData = await window.electronAPI.getRooms();
+    // 为每个房间添加租客历史标记
+    properties.value = roomsData.map(room => ({
+      ...room,
+      has_tenant_history: Boolean(room.current_tenant_id) // 如果当前有租客，必定有租客历史
+    }));
   } catch (error) {
     ElMessage.error('获取房屋列表失败');
   } finally {

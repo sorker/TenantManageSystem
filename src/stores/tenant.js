@@ -41,9 +41,9 @@ export const useTenantStore = defineStore('tenant', {
       }
     },
 
-    async updateTenantContractImages(tenantId, images) {
+    async updateTenantContractImages(tenantId, images, deleteIds) {
       try {
-        await window.electronAPI.updateTenantContractImages(tenantId, images);
+        await window.electronAPI.updateTenantContractImages(tenantId, images, deleteIds);
       } catch (error) {
         this.error = error.message;
         throw error;

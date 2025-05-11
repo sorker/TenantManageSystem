@@ -117,7 +117,9 @@ const fetchFacilities = async () => {
   loading.value = true;
   try {
     facilities.value = await window.electronAPI.getFacilities();
+    console.log('[fetchFacilities] Current facilities:', facilities.value);
   } catch (error) {
+    console.error('[fetchFacilities] Error:', error);
     ElMessage.error('获取设施列表失败');
   } finally {
     loading.value = false;
@@ -174,12 +176,14 @@ const submitForm = async () => {
 
         if (isEditing.value) {
           facilityData.id = facilityForm.value.id;
+          console.log('[updateFacility] Updating facility:', facilityData);
           await window.electronAPI.updateFacility(facilityData);
+          console.log('[updateFacility] Update completed');
           ElMessage.success('更新成功');
         } else {
-          console.log('Adding new facility:', facilityData);
+          console.log('[addFacility] Before adding facility:', facilityData);
           const newFacility = await window.electronAPI.addFacility(facilityData);
-          console.log('Add facility response:', newFacility);
+          console.log('[addFacility] API response:', newFacility);
           
           if (!newFacility || !newFacility.id) {
             throw new Error('添加设施失败：返回数据无效');
@@ -187,7 +191,7 @@ const submitForm = async () => {
 
           // 验证新添加的设备是否成功保存
           const allFacilities = await window.electronAPI.getFacilities();
-          console.log('All facilities after adding:', allFacilities);
+          console.log('[addFacility] All facilities after adding:', allFacilities);
           
           const addedFacility = allFacilities.find(f => f.id === newFacility.id);
           
@@ -200,7 +204,7 @@ const submitForm = async () => {
         dialogVisible.value = false;
         await fetchFacilities();
       } catch (error) {
-        console.error('Error in submitForm:', error);
+        console.error('[submitForm] Error:', error);
         ElMessage.error(error.message || '操作失败，请重试');
       }
     }
@@ -217,11 +221,14 @@ const deleteFacility = async (id) => {
     await ElMessageBox.confirm('确定要删除这个设施吗？', '警告', {
       type: 'warning'
     });
+    console.log('[deleteFacility] Deleting facility:', id);
     await window.electronAPI.deleteFacility(id);
+    console.log('[deleteFacility] Delete completed');
     ElMessage.success('删除成功');
     await fetchFacilities();
   } catch (error) {
     if (error !== 'cancel') {
+      console.error('[deleteFacility] Error:', error);
       ElMessage.error(error.message);
     }
   }
