@@ -22,7 +22,7 @@
     "files": [
       "dist/**/*",
       "main.js",
-      "src/database/**/*"
+      "src/**/*"
     ],
     "win": {
       "target": "nsis"
@@ -37,7 +37,7 @@
     "express": "^5.1.0",
     "mysql2": "^3.14.1",
     "pinia": "^2.1.7",
-    "sqlite3": "^5.1.7",
+    "sqlite3": "^5.0.11",
     "vue": "^3.3.11",
     "vue-router": "^4.2.5"
   },
@@ -48,6 +48,7 @@
     "cross-env": "^7.0.3",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
+    "electron-rebuild": "^3.2.9",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.1",
     "vite": "^5.0.10"

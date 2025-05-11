@@ -13,74 +13,83 @@ ipcMain.handle('get-facilities', async () => {
 
 // 添加设施
 ipcMain.handle('add-facility', async (event, facility) => {
+  if (!facility || !facility.name) {
+    throw new Error('设施名称不能为空');
+  }
+
+  const facilityData = {
+    name: facility.name,
+    description: facility.description || ''
+  };
+
   return new Promise((resolve, reject) => {
-    db.run('BEGIN TRANSACTION', (err) => {
+    // 检查是否已存在同名设施
+    db.get('SELECT id FROM facilities WHERE name = ?', [facilityData.name], (err, existing) => {
       if (err) {
-        return reject(err);
+        console.error('Error checking existing facility:', err);
+        reject(err);
+        return;
       }
 
-      const facilityData = {
-        name: facility.name,
-        description: facility.description
-      };
+      if (existing) {
+        reject(new Error('已存在同名设施'));
+        return;
+      }
 
-      // 检查是否已存在同名设施
-      db.get('SELECT id FROM facilities WHERE name = ?', [facilityData.name], (err, existing) => {
-        if (err) {
-          db.run('ROLLBACK');
-          return reject(err);
-        }
+      // 插入新设施
+      db.run(
+        'INSERT INTO facilities (name, description) VALUES (?, ?)',
+        [facilityData.name, facilityData.description],
+        function(err) {
+          if (err) {
+            console.error('Error inserting facility:', err);
+            reject(err);
+            return;
+          }
 
-        if (existing) {
-          db.run('ROLLBACK');
-          return reject(new Error('已存在同名设施'));
-        }
+          const newId = this.lastID;
 
-        // 插入新设施
-        db.run(
-          'INSERT INTO facilities (name, description) VALUES (?, ?)',
-          [facilityData.name, facilityData.description],
-          function(err) {
+          // 获取新插入的设施数据
+          db.get('SELECT * FROM facilities WHERE id = ?', [newId], (err, newFacility) => {
             if (err) {
-              db.run('ROLLBACK');
-              return reject(err);
+              console.error('Error fetching new facility:', err);
+              reject(err);
+              return;
             }
 
-            db.run('COMMIT', (err) => {
-              if (err) {
-                db.run('ROLLBACK');
-                return reject(err);
-              }
-              resolve({
-                id: this.lastID,
-                ...facilityData
-              });
-            });
-          }
-        );
-      });
+            if (!newFacility) {
+              reject(new Error('Failed to fetch newly created facility'));
+              return;
+            }
+
+            resolve(newFacility);
+          });
+        }
+      );
     });
   });
 });
 
 // 更新设施
 ipcMain.handle('update-facility', async (event, facility) => {
-  return new Promise((resolve, reject) => {
-    db.run('BEGIN TRANSACTION', (err) => {
-      if (err) {
-        return reject(err);
-      }
+  if (!facility?.id || !facility?.name) {
+    throw new Error('设施ID和名称不能为空');
+  }
 
-      // 检查是否存在同名设施（排除自身）
-      db.get('SELECT id FROM facilities WHERE name = ? AND id != ?', [facility.name, facility.id], (err, existing) => {
+  return new Promise((resolve, reject) => {
+    // 检查是否存在同名设施（排除自身）
+    db.get('SELECT id FROM facilities WHERE name = ? AND id != ?', 
+      [facility.name, facility.id], 
+      (err, existing) => {
         if (err) {
-          db.run('ROLLBACK');
-          return reject(err);
+          console.error('Error checking existing facility:', err);
+          reject(err);
+          return;
         }
 
         if (existing) {
-          db.run('ROLLBACK');
-          return reject(new Error('已存在同名设施'));
+          reject(new Error('已存在同名设施'));
+          return;
         }
 
         // 更新设施
@@ -89,21 +98,30 @@ ipcMain.handle('update-facility', async (event, facility) => {
           [facility.name, facility.description, facility.id],
           function(err) {
             if (err) {
-              db.run('ROLLBACK');
-              return reject(err);
+              console.error('Error updating facility:', err);
+              reject(err);
+              return;
             }
 
-            db.run('COMMIT', (err) => {
+            // 获取更新后的设施数据
+            db.get('SELECT * FROM facilities WHERE id = ?', [facility.id], (err, updatedFacility) => {
               if (err) {
-                db.run('ROLLBACK');
-                return reject(err);
+                console.error('Error fetching updated facility:', err);
+                reject(err);
+                return;
               }
-              resolve(facility);
+
+              if (!updatedFacility) {
+                reject(new Error('设施更新失败'));
+                return;
+              }
+
+              resolve(updatedFacility);
             });
           }
         );
-      });
-    });
+      }
+    );
   });
 });
 

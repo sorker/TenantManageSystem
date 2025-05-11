@@ -36,6 +36,18 @@ function initializeTables() {
         )
       `);
 
+      // 创建房间设施关联表
+      db.run(`
+        CREATE TABLE IF NOT EXISTS room_facilities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          room_id INTEGER NOT NULL,
+          facility_id INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+          FOREIGN KEY (facility_id) REFERENCES facilities(id) ON DELETE CASCADE
+        )
+      `);
+
       // 创建日程表
       db.run(`
         CREATE TABLE IF NOT EXISTS schedules (

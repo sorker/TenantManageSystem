@@ -288,13 +288,10 @@
       <div class="payment-history-container">
         <div class="payment-history-header">
           <div class="payment-history-actions">
-            <el-button type="primary" @click="showAddPaymentDialog">
-              新增交租记录
-            </el-button>
             <el-select 
               v-model="selectedYear" 
               placeholder="选择年份"
-              style="width: 120px; margin-left: 16px;"
+              style="width: 120px;"
             >
               <el-option
                 v-for="year in availableYears"
@@ -1037,12 +1034,22 @@ const submitPaymentForm = async () => {
   await paymentFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        // 确保日期是有效的
+        const paymentDate = paymentForm.value.payment_date ? new Date(paymentForm.value.payment_date) : null;
+        const dueDate = paymentForm.value.due_date ? new Date(paymentForm.value.due_date) : null;
+
+        if (!paymentDate) {
+          throw new Error('交租日期无效');
+        }
+
         const paymentData = {
           ...paymentForm.value,
           tenant_id: currentTenantId.value,
-          payment_date: new Date(paymentForm.value.payment_date).toISOString().split('T')[0],
-          due_date: paymentForm.value.payment_type === 'rent' ? 
-            new Date(paymentForm.value.due_date).toISOString().split('T')[0] : 
+          // 格式化日期为 YYYY-MM-DD
+          payment_date: paymentDate.toISOString().split('T')[0],
+          // 只有在是租金类型且有效日期时才设置 due_date
+          due_date: paymentForm.value.payment_type === 'rent' && dueDate ? 
+            dueDate.toISOString().split('T')[0] : 
             null
         };
         
@@ -1059,31 +1066,30 @@ const submitPaymentForm = async () => {
             });
 
             // 创建下一次交租日程，基于本次约定交租日期计算
-            const nextPaymentDate = calculateNextPaymentDate(
-              new Date(paymentData.due_date),
-              currentTenant.payment_frequency
-            );
+            if (dueDate) {
+              const nextPaymentDate = calculateNextPaymentDate(dueDate, currentTenant.payment_frequency);
 
-            // 检查是否已存在相同日期和租客的日程
-            const existingSchedules = await window.electronAPI.getSchedules();
-            const hasDuplicate = existingSchedules.some(schedule => 
-              schedule.room_id === currentTenant.room_id && 
-              new Date(schedule.date).toISOString().split('T')[0] === nextPaymentDate.toISOString().split('T')[0]
-            );
+              // 检查是否已存在相同日期和租客的日程
+              const existingSchedules = await window.electronAPI.getSchedules();
+              const hasDuplicate = existingSchedules.some(schedule => 
+                schedule.room_id === currentTenant.room_id && 
+                new Date(schedule.date).toISOString().split('T')[0] === nextPaymentDate.toISOString().split('T')[0]
+              );
 
-            // 只有在不存在重复日程时才添加新日程
-            if (!hasDuplicate) {
-              // 创建日程数据
-              const scheduleData = {
-                title: `${currentTenant.name} 交租`,
-                type: 'rent',
-                date: nextPaymentDate.toISOString(),
-                description: `租客 ${currentTenant.name} 的交租日期`,
-                room_id: currentTenant.room_id
-              };
+              // 只有在不存在重复日程时才添加新日程
+              if (!hasDuplicate) {
+                // 创建日程数据
+                const scheduleData = {
+                  title: `${currentTenant.name} 交租`,
+                  type: 'rent',
+                  date: nextPaymentDate.toISOString().split('T')[0],
+                  description: `租客 ${currentTenant.name} 的交租日期`,
+                  room_id: currentTenant.room_id
+                };
 
-              // 添加日程
-              await window.electronAPI.addSchedule(scheduleData);
+                // 添加日程
+                await window.electronAPI.addSchedule(scheduleData);
+              }
             }
           }
         }
