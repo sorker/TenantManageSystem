@@ -6,35 +6,18 @@ A modern tenant management system built with Electron and Vue 3, designed for ma
 
 ## Features 功能特点
 
-- 📋 Tenant Information Management (租客管理)
-  - Basic tenant details (基本信息)
-  - Lease information (租约信息)
-  - Payment tracking with reminder system (租金追踪和提醒系统)
-  - Automatic payment status updates (自动付款状态更新)
+- 📋 Tenant Management (租客管理)
+  - Basic information and lease management (基本信息和租约管理)
+  - Payment tracking and reminders (租金追踪和提醒)
 - 🏠 Property Management (房屋管理)
-  - Multi-level location management (多级位置管理)
-    - Province and city (省市管理)
-    - District and community (区域和小区)
-    - Building and unit (楼栋单元)
-  - Room management (房间管理)
-    - Room numbering (房间编号)
-    - Room types (房型分类)
-    - Status tracking (状态追踪)
-  - Facility mapping (设施配置)
-    - Room facilities (房间设施)
-    - Public facilities (公共设施)
+  - Location and room management (位置和房间管理)
+  - Facility configuration (设施配置)
 - ⚡ Facility Management (设施管理)
-  - Equipment inventory (设备清单)
-  - Maintenance records (维护记录)
-  - Facility-room mapping (设施房间映射)
+  - Equipment and maintenance (设备和维护)
 - 📅 Schedule Management (日程管理)
-  - Rent collection reminders (收租提醒)
-  - Payment status tracking (支付状态追踪)
-  - Automatic overdue alerts (自动逾期提醒)
+  - Rent collection and alerts (收租和提醒)
 - 📊 Data Statistics (数据统计)
-  - Revenue analysis (收入分析)
-  - Occupancy metrics (入住率统计)
-  - Payment tracking (支付追踪)
+  - Performance analysis (运营分析)
 
 ## Tech Stack 技术栈
 
@@ -65,7 +48,7 @@ npm install
 
 3. Run in development mode 开发模式运行
 ```bash
-npm run electron:dev
+npm run dev
 ```
 
 4. Build the application 构建应用
@@ -76,15 +59,23 @@ npm run electron:build
 ## Project Structure 项目结构
 
 ```
-src/
-├── modules/          # Feature modules 功能模块
-│   ├── tenant/      # Tenant management 租客管理
-│   ├── property/    # Property management 房屋管理
-│   ├── facility/    # Facility management 设施管理
-│   └── schedule/    # Schedule management 日程管理
-├── stores/          # Pinia state management 状态管理
-├── router/          # Route configuration 路由配置
-└── views/           # Page components 页面组件
+reb-block/
+├── src/                    # Source code
+│   ├── components/        # Common components
+│   ├── views/            # Page components
+│   │   ├── TenantView.vue     # 租客管理
+│   │   ├── PropertyView.vue   # 房屋管理
+│   │   ├── LocationView.vue   # 位置管理
+│   │   ├── FacilityView.vue   # 设施管理
+│   │   ├── ScheduleView.vue   # 日程管理
+│   │   └── Statistics.vue     # 数据统计
+│   ├── stores/           # Pinia stores
+│   ├── router/           # Vue Router config
+│   ├── database/         # Database operations
+│   └── assets/          # Static resources
+├── main.js              # Electron main process
+├── preload.js           # Electron preload script
+└── package.json         # Project configuration
 ```
 
 ## Database Schema 数据库结构
@@ -122,7 +113,7 @@ The system uses SQLite with the following main tables:
 
 ## Screenshots 界面截图
 
-### Tenant Management 租户管理
+### Tenant Management 租客管理
 ![Tenant Management](assets/租户管理.png)
 
 租户在预定缴纳租金时未缴费的7天前会变成红色状态提醒，如入住时已缴3月租金，但是3个月后的前7天还未缴费，最后交租日期会变为红色。
@@ -158,7 +149,6 @@ The following features are currently under development:
 以下功能正在开发中：
 
 - 📅 Schedule Management System 日程管理系统
-  - Rent collection reminders 收租提醒
   - Contract renewal notifications 合同续签通知
   - Maintenance schedule 维护计划安排
 
