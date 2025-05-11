@@ -224,7 +224,7 @@ export default defineComponent({
       'rent': '租金',
       'water': '水费',
       'electricity': '电费',
-      'property': '物业费'
+      'maintenance': '维修费'
     };
 
     // 添加独立的年度和月度时间选择

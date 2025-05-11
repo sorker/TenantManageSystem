@@ -14,7 +14,7 @@ const PAYMENT_TYPE_LABELS = {
   'rent': '租金',
   'water': '水费',
   'electricity': '电费',
-  'property': '物业费'
+  'maintenance': '维修费'
 };
 
 // 获取所有费用类型

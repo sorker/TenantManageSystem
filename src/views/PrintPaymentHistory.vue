@@ -107,7 +107,7 @@ const PAYMENT_TYPE_LABELS = {
   'rent': '租金',
   'water': '水费',
   'electricity': '电费',
-  'property': '物业费'
+  'maintenance': '维修费'
 };
 
 // 支付方式标签
@@ -133,27 +133,40 @@ const goBack = () => {
 
 // 执行打印
 const printData = () => {
-  const printContent = document.querySelector('.print-content').innerHTML;
-  const originalContent = document.body.innerHTML;
-  
-  const printStyles = `
-    <style>
-      @media print {
+  // 创建打印专用的 iframe
+  let printFrame = document.createElement('iframe');
+  printFrame.style.position = 'fixed';
+  printFrame.style.right = '0';
+  printFrame.style.bottom = '0';
+  printFrame.style.width = '0';
+  printFrame.style.height = '0';
+  printFrame.style.border = '0';
+  document.body.appendChild(printFrame);
+
+  // 获取打印内容
+  const printContent = document.querySelector('.print-content');
+  if (!printContent) return;
+
+  // 设置 iframe 内容
+  const frameDoc = printFrame.contentWindow.document;
+  frameDoc.open();
+  frameDoc.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>${tenantName.value} - ${selectedYear.value}年交租记录</title>
+      <meta charset="utf-8">
+      <style>
         body {
           padding: 20px;
           font-family: Arial, sans-serif;
-        }
-        .header-actions {
-          display: none;
         }
         .print-title {
           text-align: center;
           margin-bottom: 20px;
         }
-        .summary-section {
-          margin-top: 20px;
-          text-align: right;
-          font-size: 14px;
+        .print-content {
+          width: 100%;
         }
         table {
           width: 100%;
@@ -161,26 +174,45 @@ const printData = () => {
           margin: 20px 0;
         }
         th, td {
-          border: 1px solid #ddd;
+          border: 1px solid #000;
           padding: 8px;
           text-align: left;
         }
         th {
-          background-color: #f5f7fa;
+          background-color: #f0f0f0;
+        }
+        .summary-section {
+          margin-top: 20px;
+          text-align: right;
         }
         .print-time {
           margin-top: 10px;
-          color: #909399;
+          color: #666;
           font-size: 12px;
         }
-      }
-    </style>
-  `;
+      </style>
+    </head>
+    <body>
+      ${printContent.innerHTML}
+    </body>
+    </html>
+  `);
+  frameDoc.close();
 
-  document.body.innerHTML = printStyles + printContent;
-  window.print();
-  document.body.innerHTML = originalContent;
-  window.location.reload();
+  // 等待图片加载完成后打印
+  printFrame.onload = () => {
+    try {
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+    } catch (e) {
+      console.error('打印失败:', e);
+      ElMessage.error('打印失败，请重试');
+    }
+    // 延迟移除 iframe
+    setTimeout(() => {
+      document.body.removeChild(printFrame);
+    }, 100);
+  };
 };
 
 onMounted(async () => {
