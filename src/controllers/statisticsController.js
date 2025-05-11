@@ -98,19 +98,28 @@ ipcMain.handle('get-monthly-payment-statistics', async (event, params) => {
     `;
     queryParams.push(`${year}-${month.padStart(2, '0')}`);
   } else {
-    // 按月统计
+    // 按月统计，确保获取所有月份的数据
     query = `
+      WITH RECURSIVE months(month) AS (
+        SELECT '01'
+        UNION ALL
+        SELECT printf('%02d', CAST(month AS INTEGER) + 1)
+        FROM months
+        WHERE CAST(month AS INTEGER) < 12
+      )
       SELECT 
-        strftime('%m', payment_date) as month,
-        COUNT(*) as payment_count,
-        SUM(amount) as total_amount,
-        SUM(CASE WHEN payment_date <= due_date THEN 1 ELSE 0 END) as on_time_count,
-        SUM(CASE WHEN payment_date > due_date THEN 1 ELSE 0 END) as overdue_count
-      FROM payment_history
-      WHERE strftime('%Y', payment_date) = ?
-      ${payment_type ? 'AND payment_type = ?' : ''}
-      GROUP BY month
-      ORDER BY month
+        m.month,
+        COALESCE(COUNT(ph.id), 0) as payment_count,
+        COALESCE(SUM(ph.amount), 0) as total_amount,
+        COALESCE(SUM(CASE WHEN ph.payment_date <= ph.due_date THEN 1 ELSE 0 END), 0) as on_time_count,
+        COALESCE(SUM(CASE WHEN ph.payment_date > ph.due_date THEN 1 ELSE 0 END), 0) as overdue_count
+      FROM months m
+      LEFT JOIN payment_history ph ON 
+        strftime('%m', ph.payment_date) = m.month 
+        AND strftime('%Y', ph.payment_date) = ?
+        ${payment_type ? 'AND ph.payment_type = ?' : ''}
+      GROUP BY m.month
+      ORDER BY m.month
     `;
     queryParams.push(year);
   }

@@ -271,21 +271,35 @@
     >
       <div class="payment-history-container">
         <div class="payment-history-header">
-          <el-button type="primary" @click="showAddPaymentDialog">
-            新增交租记录
-          </el-button>
+          <div class="payment-history-actions">
+            <el-button type="primary" @click="showAddPaymentDialog">
+              新增交租记录
+            </el-button>
+            <el-select 
+              v-model="selectedYear" 
+              placeholder="选择年份"
+              style="width: 120px; margin-left: 16px;"
+            >
+              <el-option
+                v-for="year in availableYears"
+                :key="year"
+                :label="year + '年'"
+                :value="year"
+              />
+            </el-select>
+          </div>
         </div>
         
         <el-table
-          :data="currentPaymentHistory"
+          :data="filteredPaymentHistory"
           style="width: 100%"
         >
-          <el-table-column prop="due_date" label="约定交租日期">
+          <el-table-column prop="due_date" label="约定日期">
             <template #default="{ row }">
-              {{ new Date(row.due_date).toLocaleDateString() }}
+              {{ row.due_date ? new Date(row.due_date).toLocaleDateString() : '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="payment_date" label="实际交租日期">
+          <el-table-column prop="payment_date" label="缴费日期">
             <template #default="{ row }">
               {{ new Date(row.payment_date).toLocaleDateString() }}
             </template>
@@ -458,6 +472,7 @@ const roomNumberFilter = ref('');
 const rooms = ref([]);
 const renewDialogVisible = ref(false);
 const renewFormRef = ref(null);
+const selectedYear = ref(new Date().getFullYear());
 const renewForm = ref({
   room_id: null,
   rent_amount: 0,
@@ -820,6 +835,7 @@ const submitRenewForm = async () => {
 
 const showPaymentHistory = async (tenant) => {
   currentTenantId.value = tenant.id;
+  selectedYear.value = new Date().getFullYear();
   try {
     currentPaymentHistory.value = await store.getTenantPaymentHistory(tenant.id);
     paymentHistoryVisible.value = true;
@@ -1128,7 +1144,7 @@ const isPaymentOverdue = async (tenant) => {
     }
     
     // 如果距离约定日期在7天之内（包括已过期7天内）且未超过周期减7天，则显示红色
-    return diffDays > -7 && diffDays < (periodDays - 7);
+    return diffDays < (periodDays - 7);
   } catch (error) {
     console.error('获取交租历史失败:', error);
     return false;
@@ -1144,6 +1160,24 @@ watch(() => store.tenants, async (newTenants) => {
     tenant.isOverdue = await isPaymentOverdue(tenant);
   }
 }, { deep: true, immediate: true });
+
+// 添加过滤后的交租历史计算属性
+const filteredPaymentHistory = computed(() => {
+  return currentPaymentHistory.value.filter(payment => {
+    const paymentYear = new Date(payment.payment_date).getFullYear();
+    return paymentYear === selectedYear.value;
+  });
+});
+
+// 添加可用年份的计算属性
+const availableYears = computed(() => {
+  const years = new Set(currentPaymentHistory.value.map(payment => 
+    new Date(payment.payment_date).getFullYear()
+  ));
+  const currentYear = new Date().getFullYear();
+  years.add(currentYear); // 确保当年总是可选的
+  return Array.from(years).sort((a, b) => b - a); // 降序排列
+});
 </script>
 
 <style scoped>
@@ -1242,6 +1276,11 @@ watch(() => store.tenants, async (newTenants) => {
 
 .payment-history-header {
   margin-bottom: 20px;
+}
+
+.payment-history-actions {
+  display: flex;
+  align-items: center;
 }
 
 .filter-container {

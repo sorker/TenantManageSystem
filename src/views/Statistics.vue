@@ -23,6 +23,7 @@
             format="YYYY年"
             value-format="YYYY"
             @change="handleDateChange"
+            :default-value="yearDefaultValue"
           />
           
           <el-date-picker
@@ -33,6 +34,7 @@
             format="YYYY年MM月"
             value-format="YYYY-MM"
             @change="handleDateChange"
+            :default-value="monthDefaultValue"
           />
 
           <el-select
@@ -189,7 +191,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { defineComponent, ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
 
@@ -224,6 +226,18 @@ export default defineComponent({
       'electricity': '电费',
       'property': '物业费'
     };
+
+    // 添加独立的年度和月度时间选择
+    const yearStatistics = ref({
+      year: dayjs().format('YYYY')
+    });
+    const monthStatistics = ref({
+      month: dayjs().format('YYYY-MM')
+    });
+
+    // 计算默认值
+    const yearDefaultValue = computed(() => dayjs(yearStatistics.value.year).toDate());
+    const monthDefaultValue = computed(() => dayjs(monthStatistics.value.month).toDate());
 
     // 格式化数字
     const formatNumber = (value, decimals = 0) => {
@@ -264,13 +278,22 @@ export default defineComponent({
       let seriesData = [];
 
       if (dateType.value === 'year') {
-        // 年度视图：显示1-12月
-        xAxisData = monthlyData.value.map(item => `${item.month}月`);
+        // 使用后端返回的月度数据，已经包含了所有月份
+        xAxisData = monthlyData.value.map(item => `${parseInt(item.month)}月`);
         seriesData = monthlyData.value.map(item => Number(item.total_amount || 0));
       } else {
         // 月度视图：显示1-31日
-        xAxisData = monthlyData.value.map(item => item.date.split('-')[2] + '日');
-        seriesData = monthlyData.value.map(item => Number(item.total_amount || 0));
+        const daysInMonth = dayjs(selectedMonth.value).daysInMonth();
+        const dailyDataMap = new Map(
+          monthlyData.value.map(item => [item.date.split('-')[2], item.total_amount || 0])
+        );
+
+        // 生成当月所有日期的数据
+        for (let i = 1; i <= daysInMonth; i++) {
+          const dayKey = String(i).padStart(2, '0');
+          xAxisData.push(`${i}日`);
+          seriesData.push(Number(dailyDataMap.get(dayKey) || 0));
+        }
       }
 
       const option = {
@@ -359,20 +382,19 @@ export default defineComponent({
 
     // 加载统计数据
     const loadStatistics = async () => {
-      console.log('Loading statistics...');
       loading.value = true;
       try {
         let startDate, endDate;
         
         if (dateType.value === 'year') {
-          startDate = dayjs(selectedYear.value).startOf('year');
-          endDate = dayjs(selectedYear.value).endOf('year');
+          const currentYear = yearStatistics.value.year;
+          startDate = dayjs(currentYear).startOf('year');
+          endDate = dayjs(currentYear).endOf('year');
         } else {
-          startDate = dayjs(selectedMonth.value).startOf('month');
-          endDate = dayjs(selectedMonth.value).endOf('month');
+          const currentMonth = monthStatistics.value.month;
+          startDate = dayjs(currentMonth).startOf('month');
+          endDate = dayjs(currentMonth).endOf('month');
         }
-
-        console.log('Date range:', { startDate: startDate.format('YYYY-MM-DD'), endDate: endDate.format('YYYY-MM-DD') });
 
         const params = {
           startDate: startDate.format('YYYY-MM-DD'),
@@ -382,7 +404,6 @@ export default defineComponent({
 
         // 获取总体统计数据
         const stats = await window.electronAPI.getPaymentStatistics(params);
-        console.log('Received statistics:', stats);
         statisticsData.value = stats;
 
         // 计算总计指标
@@ -392,30 +413,30 @@ export default defineComponent({
         const totalOnTime = stats.reduce((sum, item) => sum + item.on_time_count, 0);
         const totalPayments = stats.reduce((sum, item) => sum + item.payment_count, 0);
         onTimeRate.value = totalPayments > 0 ? (totalOnTime / totalPayments) * 100 : 0;
-        
-        averageOverdueDays.value = stats.reduce((sum, item) => {
-          return sum + (item.average_overdue_days * item.payment_count);
-        }, 0) / (totalPayments || 1);
 
         // 获取月度统计数据
         const monthlyStats = await window.electronAPI.getMonthlyPaymentStatistics({
-          year: dayjs().year(),
-          payment_type: selectedPaymentType.value,
+          year: dateType.value === 'year' ? yearStatistics.value.year : monthStatistics.value.month.split('-')[0],
+          month: dateType.value === 'month' ? monthStatistics.value.month.split('-')[1] : null,
+          payment_type: selectedPaymentType.value
         });
+        
         monthlyData.value = monthlyStats;
+        
+        // 计算当前期间的总金额
+        if (dateType.value === 'year') {
+          currentPeriodTotal.value = monthlyStats.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
+          currentPeriodCount.value = monthlyStats.reduce((sum, item) => sum + (Number(item.payment_count) || 0), 0);
+        } else {
+          currentPeriodTotal.value = monthlyStats.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
+          currentPeriodCount.value = monthlyStats.reduce((sum, item) => sum + (Number(item.payment_count) || 0), 0);
+        }
 
-        // 获取支付方式统计
-        const methodStats = await window.electronAPI.getPaymentMethodStatistics(params);
-        paymentMethodData.value = methodStats;
-
-        // 确保图表已初始化
-        initCharts();
-        // 更新图表
-        updateMonthlyChart();
-
-        // 计算当前期间的总金额和笔数
-        currentPeriodTotal.value = stats.reduce((sum, item) => sum + item.total_amount, 0);
-        currentPeriodCount.value = stats.reduce((sum, item) => sum + item.payment_count, 0);
+        // 确保图表已初始化并更新
+        nextTick(() => {
+          initCharts();
+          updateMonthlyChart();
+        });
 
       } catch (error) {
         console.error('Failed to load statistics:', error);
@@ -430,6 +451,12 @@ export default defineComponent({
     };
 
     const handleDateChange = () => {
+      // 根据当前统计类型更新对应的时间值
+      if (dateType.value === 'year') {
+        yearStatistics.value.year = selectedYear.value;
+      } else {
+        monthStatistics.value.month = selectedMonth.value;
+      }
       loadStatistics();
     };
 
@@ -444,6 +471,9 @@ export default defineComponent({
 
     onMounted(() => {
       nextTick(async () => {
+        // 初始化年度和月度的时间值
+        yearStatistics.value.year = selectedYear.value;
+        monthStatistics.value.month = selectedMonth.value;
         await loadPaymentTypes();
         await loadStatistics();
         initCharts();
@@ -464,6 +494,8 @@ export default defineComponent({
       dateType,
       selectedYear,
       selectedMonth,
+      yearStatistics,
+      monthStatistics,
       selectedPaymentType,
       paymentTypes,
       isLoadingTypes,
@@ -483,6 +515,8 @@ export default defineComponent({
       calculateOnTimeRate,
       getPaymentTypeLabel,
       PAYMENT_TYPE_LABELS,
+      yearDefaultValue,
+      monthDefaultValue,
     };
   },
 });
