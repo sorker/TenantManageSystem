@@ -56,6 +56,26 @@
               :value="type"
             />
           </el-select>
+
+          <el-select
+            v-model="selectedLocation"
+            placeholder="选择位置"
+            clearable
+            style="width: 150px"
+            @change="handleLocationChange"
+            :loading="isLoadingLocations"
+          >
+            <el-option
+              label="全部位置"
+              value=""
+            />
+            <el-option
+              v-for="location in locations"
+              :key="location.id"
+              :label="location.name"
+              :value="location.id"
+            />
+          </el-select>
         </el-space>
       </div>
 
@@ -202,12 +222,15 @@ export default defineComponent({
     const selectedYear = ref(dayjs().format('YYYY'));
     const selectedMonth = ref(dayjs().format('YYYY-MM'));
     const selectedPaymentType = ref('');
+    const selectedLocation = ref('');
     const loading = ref(false);
     const statisticsData = ref([]);
     const monthlyData = ref([]);
     const paymentMethodData = ref([]);
     const paymentTypes = ref([]);
+    const locations = ref([]);
     const isLoadingTypes = ref(true);
+    const isLoadingLocations = ref(true);
     const monthlyChartContainer = ref(null);
     const monthlyChartInstance = ref(null);
     const currentPeriodTotal = ref(0);
@@ -380,6 +403,18 @@ export default defineComponent({
       }
     };
 
+    // 加载位置数据
+    const loadLocations = async () => {
+      try {
+        isLoadingLocations.value = true;
+        locations.value = await window.electronAPI.getLocations();
+      } catch (error) {
+        console.error('加载位置数据失败:', error);
+      } finally {
+        isLoadingLocations.value = false;
+      }
+    };
+
     // 加载统计数据
     const loadStatistics = async () => {
       loading.value = true;
@@ -396,20 +431,20 @@ export default defineComponent({
           endDate = dayjs(currentMonth).endOf('month');
         }
 
-        const params = {
+        // 获取统计数据
+        const stats = await window.electronAPI.getPaymentStatistics({
           startDate: startDate.format('YYYY-MM-DD'),
           endDate: endDate.format('YYYY-MM-DD'),
-          payment_type: selectedPaymentType.value || null
-        };
+          payment_type: selectedPaymentType.value,
+          location_id: selectedLocation.value
+        });
 
-        // 获取总体统计数据
-        const stats = await window.electronAPI.getPaymentStatistics(params);
         statisticsData.value = stats;
 
-        // 计算总计指标
+        // 计算总计
         totalAmount.value = stats.reduce((sum, item) => sum + item.total_amount, 0);
         totalCount.value = stats.reduce((sum, item) => sum + item.payment_count, 0);
-        
+
         const totalOnTime = stats.reduce((sum, item) => sum + item.on_time_count, 0);
         const totalPayments = stats.reduce((sum, item) => sum + item.payment_count, 0);
         onTimeRate.value = totalPayments > 0 ? (totalOnTime / totalPayments) * 100 : 0;
@@ -418,28 +453,38 @@ export default defineComponent({
         const monthlyStats = await window.electronAPI.getMonthlyPaymentStatistics({
           year: dateType.value === 'year' ? yearStatistics.value.year : monthStatistics.value.month.split('-')[0],
           month: dateType.value === 'month' ? monthStatistics.value.month.split('-')[1] : null,
-          payment_type: selectedPaymentType.value
+          payment_type: selectedPaymentType.value,
+          location_id: selectedLocation.value
         });
-        
+
         monthlyData.value = monthlyStats;
-        
-        // 计算当前期间的总金额
+
+        // 更新当前周期统计
         if (dateType.value === 'year') {
-          currentPeriodTotal.value = monthlyStats.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
-          currentPeriodCount.value = monthlyStats.reduce((sum, item) => sum + (Number(item.payment_count) || 0), 0);
+          currentPeriodTotal.value = totalAmount.value;
+          currentPeriodCount.value = totalCount.value;
         } else {
-          currentPeriodTotal.value = monthlyStats.reduce((sum, item) => sum + (Number(item.total_amount) || 0), 0);
-          currentPeriodCount.value = monthlyStats.reduce((sum, item) => sum + (Number(item.payment_count) || 0), 0);
+          const currentMonthData = monthlyStats;
+          currentPeriodTotal.value = currentMonthData.reduce((sum, item) => sum + item.total_amount, 0);
+          currentPeriodCount.value = currentMonthData.reduce((sum, item) => sum + item.payment_count, 0);
         }
 
-        // 确保图表已初始化并更新
-        nextTick(() => {
-          initCharts();
-          updateMonthlyChart();
+        // 获取支付方式统计
+        const methodStats = await window.electronAPI.getPaymentMethodStatistics({
+          startDate: startDate.format('YYYY-MM-DD'),
+          endDate: endDate.format('YYYY-MM-DD'),
+          payment_type: selectedPaymentType.value,
+          location_id: selectedLocation.value
         });
 
+        paymentMethodData.value = methodStats;
+
+        // 更新图表
+        await nextTick();
+        updateMonthlyChart();
+
       } catch (error) {
-        console.error('Failed to load statistics:', error);
+        console.error('加载统计数据失败:', error);
       } finally {
         loading.value = false;
       }
@@ -464,6 +509,10 @@ export default defineComponent({
       loadStatistics();
     };
 
+    const handleLocationChange = () => {
+      loadStatistics();
+    };
+
     // 监听窗口大小变化
     const handleResize = () => {
       monthlyChartInstance.value?.resize();
@@ -474,7 +523,10 @@ export default defineComponent({
         // 初始化年度和月度的时间值
         yearStatistics.value.year = selectedYear.value;
         monthStatistics.value.month = selectedMonth.value;
-        await loadPaymentTypes();
+        await Promise.all([
+          loadPaymentTypes(),
+          loadLocations()
+        ]);
         await loadStatistics();
         initCharts();
       });
@@ -497,20 +549,22 @@ export default defineComponent({
       yearStatistics,
       monthStatistics,
       selectedPaymentType,
+      selectedLocation,
       paymentTypes,
-      isLoadingTypes,
-      loading,
+      locations,
       statisticsData,
-      totalAmount,
-      totalCount,
-      onTimeRate,
-      averageOverdueDays,
+      loading,
+      isLoadingTypes,
+      isLoadingLocations,
       monthlyChartContainer,
+      totalAmount,
       currentPeriodTotal,
       currentPeriodCount,
+      onTimeRate,
       handleDateTypeChange,
       handleDateChange,
       handlePaymentTypeChange,
+      handleLocationChange,
       formatNumber,
       calculateOnTimeRate,
       getPaymentTypeLabel,
