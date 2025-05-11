@@ -70,6 +70,7 @@ function initializeTables() {
           payment_date DATE NOT NULL,
           due_date DATE NOT NULL,
           amount DECIMAL(10,2) NOT NULL,
+          payment_type TEXT NOT NULL,
           payment_method TEXT NOT NULL,
           notes TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

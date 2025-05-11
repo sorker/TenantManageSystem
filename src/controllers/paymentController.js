@@ -22,13 +22,14 @@ ipcMain.handle('add-payment-record', async (event, payment) => {
   return new Promise((resolve, reject) => {
     db.run(
       `INSERT INTO payment_history (
-        tenant_id, payment_date, due_date, amount, payment_method, notes
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
+        tenant_id, payment_date, due_date, amount, payment_type, payment_method, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         payment.tenant_id,
         payment.payment_date,
         payment.due_date,
         payment.amount,
+        payment.payment_type,
         payment.payment_method,
         payment.notes
       ],

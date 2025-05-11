@@ -60,5 +60,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSchedules: () => safeInvoke('get-schedules'),
   addSchedule: (schedule) => safeInvoke('add-schedule', schedule),
   updateSchedule: (schedule) => safeInvoke('update-schedule', schedule),
-  deleteSchedule: (id) => safeInvoke('delete-schedule', id)
+  deleteSchedule: (id) => safeInvoke('delete-schedule', id),
+
+  // 统计管理
+  getPaymentTypes: () => safeInvoke('get-payment-types'),
+  getPaymentStatistics: (params) => safeInvoke('get-payment-statistics', params),
+  getMonthlyPaymentStatistics: (params) => safeInvoke('get-monthly-payment-statistics', params),
+  getPaymentMethodStatistics: (params) => safeInvoke('get-payment-method-statistics', params)
 }); 
