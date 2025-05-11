@@ -42,8 +42,8 @@ function getPreloadPath() {
     // 开发模式：使用项目根目录的 preload.js
     return path.join(__dirname, 'preload.js');
   } else {
-    // 生产模式：使用应用程序目录中的 preload.js
-    return path.join(app.getAppPath(), 'preload.js');
+    // 生产模式：使用打包后的 preload.js
+    return path.join(process.resourcesPath, 'app', 'preload.js');
   }
 }
 

@@ -136,6 +136,8 @@
               size="small" 
               type="danger" 
               @click="deleteTenant(row.id)"
+              :disabled="!!row.last_payment_date"
+              :title="row.last_payment_date ? '已有交租记录，不能删除' : ''"
             >
               删除
             </el-button>

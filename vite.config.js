@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { join } from 'path';
 
 export default defineConfig({
   plugins: [vue()],
@@ -13,6 +14,17 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    rollupOptions: {
+      input: {
+        main: join(__dirname, 'index.html'),
+        preload: join(__dirname, 'preload.js')
+      },
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].[hash].js',
+        assetFileNames: '[name].[ext]'
+      }
+    }
   },
   server: {
     proxy: {
