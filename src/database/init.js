@@ -1,6 +1,7 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const EventEmitter = require('events');
+const { app } = require('electron');
 
 class Database extends EventEmitter {
   constructor() {
@@ -16,35 +17,45 @@ class Database extends EventEmitter {
     }
 
     try {
-      const dbPath = path.join(process.cwd(), 'tenant.db');
+      // 使用 app.getPath('userData') 来获取应用数据目录
+      const dbPath = path.join(app.getPath('userData'), 'tenant.db');
       console.log('Connecting to database at:', dbPath);
       
-      this.db = new sqlite3.Database(dbPath, async (err) => {
-        if (err) {
-          console.error('Error connecting to database:', err);
-          this.emit('error', err);
-          return;
-        }
-        console.log('Connected to database successfully');
-        
-        try {
-          await this.createTables();
-          this.isReady = true;
-          this.emit('open');
-        } catch (error) {
-          console.error('Error during table creation:', error);
-          this.emit('error', error);
-        }
-      });
+      return new Promise((resolve, reject) => {
+        this.db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, async (err) => {
+          if (err) {
+            console.error('Error connecting to database:', err);
+            this.emit('error', err);
+            reject(err);
+            return;
+          }
+          console.log('Connected to database successfully');
+          
+          try {
+            // 启用外键约束
+            this.db.run('PRAGMA foreign_keys = ON');
+            
+            await this.createTables();
+            this.isReady = true;
+            this.emit('open');
+            resolve();
+          } catch (error) {
+            console.error('Error during table creation:', error);
+            this.emit('error', error);
+            reject(error);
+          }
+        });
 
-      this.db.on('error', (err) => {
-        console.error('Database error:', err);
-        this.isReady = false;
-        this.emit('error', err);
+        this.db.on('error', (err) => {
+          console.error('Database error:', err);
+          this.isReady = false;
+          this.emit('error', err);
+        });
       });
     } catch (error) {
       console.error('Exception during database connection:', error);
       this.emit('error', error);
+      throw error;
     }
   }
 
@@ -157,7 +168,7 @@ class Database extends EventEmitter {
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               tenant_id INTEGER NOT NULL,
               payment_date DATE NOT NULL,
-              due_date DATE NOT NULL,
+              due_date DATE,
               amount REAL NOT NULL,
               payment_method TEXT,
               payment_type TEXT DEFAULT 'rent',
@@ -258,7 +269,8 @@ class Database extends EventEmitter {
   }
 }
 
+// 创建单例
 const db = new Database();
-db.connect();
 
+// 不要在这里调用 connect，让主进程来控制初始化时机
 module.exports = db; 

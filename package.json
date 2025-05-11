@@ -8,25 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development electron .",
-    "electron:build": "vite build && electron-builder",
+    "electron:build": "vite build && electron-builder --config electron-builder.json",
     "start": "electron .",
     "test": "jest",
     "test:watch": "jest --watch"
-  },
-  "build": {
-    "appId": "com.tenant.management",
-    "productName": "租客管理系统",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "main.js",
-      "src/**/*"
-    ],
-    "win": {
-      "target": "nsis"
-    }
   },
   "dependencies": {
     "axios": "^1.9.0",

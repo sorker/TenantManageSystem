@@ -1,0 +1,32 @@
+{
+  "appId": "com.tenant-management-system",
+  "productName": "租客管理系统",
+  "directories": {
+    "output": "release",
+    "buildResources": "build"
+  },
+  "files": [
+    "dist/**/*",
+    "src/**/*",
+    "package.json",
+    "main.js"
+  ],
+  "extraFiles": [
+    {
+      "from": "preload.js",
+      "to": "preload.js"
+    }
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "public/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "租客管理系统"
+  },
+  "asar": true
+} 

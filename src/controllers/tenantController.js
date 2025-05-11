@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron');
+const { ipcMain, app } = require('electron');
 const db = require('../database/init');
 const path = require('path');
 const fs = require('fs');
@@ -118,7 +118,7 @@ ipcMain.handle('update-tenant-contract-images', async (event, tenantId, images, 
 
       // 删除文件
       imagesToDelete.forEach(img => {
-        const fullPath = path.join(__dirname, '..', '..', img.file_path);
+        const fullPath = path.join(app.getPath('userData'), img.file_path);
         if (fs.existsSync(fullPath)) {
           try {
             fs.unlinkSync(fullPath);
@@ -145,7 +145,7 @@ ipcMain.handle('update-tenant-contract-images', async (event, tenantId, images, 
     // 插入新的合同图片
     if (images && images.length > 0) {
       // 创建租客专属目录
-      const contractsDir = path.join(__dirname, '..', '..', 'contracts');
+      const contractsDir = path.join(app.getPath('userData'), 'contracts');
       const tenantDir = path.join(contractsDir, tenantId.toString());
       fs.mkdirSync(tenantDir, { recursive: true });
       
