@@ -40,6 +40,11 @@ const routes = [
     path: '/statistics',
     name: 'Statistics',
     component: Statistics
+  },
+  {
+    path: '/print-payment-history/:id',
+    name: 'print-payment-history',
+    component: () => import('../views/PrintPaymentHistory.vue')
   }
 ];
 

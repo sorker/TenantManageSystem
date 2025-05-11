@@ -33,18 +33,18 @@
       style="width: 100%; margin-top: 20px;"
     >
       <el-table-column prop="name" label="姓名" />
-      <el-table-column label="隐私信息" width="120">
+      <el-table-column label="隐私信息" width="80">
         <template #default="{ row }">
           <el-button 
             size="small" 
             type="info"
             @click="showPrivacyInfo(row)"
           >
-            查看隐私信息
+            查看
           </el-button>
         </template>
       </el-table-column>
-      <el-table-column prop="check_in_date" label="入住时间" width="140">
+      <el-table-column prop="check_in_date" label="入住时间" width="110">
         <template #default="{ row }">
           {{ row.check_in_date ? new Date(row.check_in_date).toLocaleDateString() : '-' }}
         </template>
@@ -62,15 +62,31 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="交租历史" width="100">
+      <el-table-column label="交租历史" width="180">
         <template #default="{ row }">
-          <el-button 
-            size="small" 
-            type="primary"
-            @click="showPaymentHistory(row)"
-          >
-            查看
-          </el-button>
+          <el-button-group>
+            <el-button 
+              size="small" 
+              type="primary"
+              @click="showPaymentHistory(row)"
+            >
+              查看
+            </el-button>
+            <el-button 
+              size="small" 
+              type="success"
+              @click="showAddPaymentDialog(row)"
+            >
+              缴费
+            </el-button>
+            <el-button 
+              size="small" 
+              type="info"
+              @click="goPrintPage(row)"
+            >
+              打印
+            </el-button>
+          </el-button-group>
         </template>
       </el-table-column>
       <el-table-column prop="room_id" label="房间号">
@@ -85,7 +101,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="合同" width="100">
+      <el-table-column label="合同" width="80">
         <template #default="{ row }">
           <el-button 
             size="small" 
@@ -375,7 +391,12 @@
           />
         </el-form-item>
         <el-form-item label="金额" prop="amount">
-          <el-input-number v-model="paymentForm.amount" :min="0" :precision="2" />
+          <div class="amount-input-group">
+            <el-input-number v-model="paymentForm.amount" :min="0" :precision="2" />
+            <span v-if="paymentForm.payment_type === 'rent'" class="monthly-rent-hint">
+              (月租:¥{{ currentTenant?.rent_amount || 0 }})
+            </span>
+          </div>
         </el-form-item>
         <el-form-item label="支付方式" prop="payment_method">
           <el-select v-model="paymentForm.payment_method">
@@ -441,6 +462,80 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- Print Dialog -->
+    <el-dialog
+      v-model="printDialogVisible"
+      title="打印交租历史"
+      width="400px"
+    >
+      <el-form>
+        <el-form-item label="选择年份">
+          <el-select 
+            v-model="printYear" 
+            placeholder="选择年份"
+            style="width: 120px;"
+          >
+            <el-option
+              v-for="year in printYearOptions"
+              :key="year"
+              :label="year + '年'"
+              :value="year"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="printDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="printPaymentHistory">
+            打印
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 打印内容 -->
+    <div ref="printSection" class="print-section">
+      <div class="print-header">
+        <h2>{{ printTenant?.name || '' }} - {{ printYear }}年交租记录</h2>
+      </div>
+      <el-table
+        :data="printPaymentData"
+        style="width: 100%"
+        border
+      >
+        <el-table-column prop="due_date" label="约定交租日期">
+          <template #default="{ row }">
+            {{ row.due_date ? new Date(row.due_date).toLocaleDateString() : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="payment_date" label="实际交租日期">
+          <template #default="{ row }">
+            {{ new Date(row.payment_date).toLocaleDateString() }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="payment_type" label="费用类别">
+          <template #default="{ row }">
+            {{ getPaymentTypeLabel(row.payment_type) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="amount" label="金额">
+          <template #default="{ row }">
+            ¥{{ row.amount }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="payment_method" label="支付方式">
+          <template #default="{ row }">
+            {{ getPaymentMethodLabel(row.payment_method) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="notes" label="备注" />
+      </el-table>
+      <div class="print-footer">
+        <p>打印时间：{{ new Date().toLocaleString() }}</p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -449,8 +544,9 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useTenantStore } from '../stores/tenant';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
-import { useRoute } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 
+const router = useRouter();
 const route = useRoute();
 const store = useTenantStore();
 const loading = ref(false);
@@ -845,37 +941,40 @@ const showPaymentHistory = async (tenant) => {
   }
 };
 
-const showAddPaymentDialog = () => {
-  const currentTenant = store.tenants.find(t => t.id === currentTenantId.value);
-  if (!currentTenant) return;
+const showAddPaymentDialog = (tenant) => {
+  if (!tenant) return;
+  currentTenantId.value = tenant.id;
 
   // 计算约定交租日期
   let dueDate;
-  if (currentTenant.last_payment_date) {
+  if (tenant.last_payment_date) {
     // 如果有上次交租记录，获取上次约定交租日期
     // 先找到所有实际交租日期匹配的记录，然后按约定日期排序取最后一个
     const matchingPayments = currentPaymentHistory.value
-      .filter(p => new Date(p.payment_date).getTime() === new Date(currentTenant.last_payment_date).getTime())
+      .filter(p => new Date(p.payment_date).getTime() === new Date(tenant.last_payment_date).getTime())
       .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
     
     const lastPayment = matchingPayments[matchingPayments.length - 1];
     
     if (lastPayment) {
       // 基于上次约定交租日期计算下一次约定交租日期
-      dueDate = calculateNextPaymentDate(new Date(lastPayment.due_date), currentTenant.payment_frequency);
+      dueDate = calculateNextPaymentDate(new Date(lastPayment.due_date), tenant.payment_frequency);
     } else {
       // 如果找不到上次约定交租日期，使用入住日期
-      dueDate = new Date(currentTenant.check_in_date);
+      dueDate = new Date(tenant.check_in_date);
     }
   } else {
     // 如果没有交租记录，使用入住日期
-    dueDate = new Date(currentTenant.check_in_date);
+    dueDate = new Date(tenant.check_in_date);
   }
+
+  // 根据交租方式计算金额
+  const amount = calculateRentAmount(tenant.rent_amount, tenant.payment_frequency);
 
   paymentForm.value = {
     payment_date: new Date(),
     due_date: dueDate,
-    amount: currentTenant.rent_amount,
+    amount: amount,
     payment_method: 'cash',
     payment_type: 'rent',
     notes: ''
@@ -883,32 +982,52 @@ const showAddPaymentDialog = () => {
   addPaymentVisible.value = true;
 };
 
+// 根据交租方式计算金额
+const calculateRentAmount = (baseAmount, frequency) => {
+  switch (frequency) {
+    case 'monthly':
+      return baseAmount;
+    case 'quarterly':
+      return baseAmount * 3;
+    case 'semi_annual':
+      return baseAmount * 6;
+    case 'yearly':
+      return baseAmount * 12;
+    default:
+      return baseAmount;
+  }
+};
+
 const handlePaymentTypeChange = (value) => {
-  if (value !== 'rent') {
-    paymentForm.value.due_date = null;
-  } else {
-    // 如果切换回租金类型，重新计算约定交租日期
-    const currentTenant = store.tenants.find(t => t.id === currentTenantId.value);
-    if (currentTenant) {
-      if (currentTenant.last_payment_date) {
-        const matchingPayments = currentPaymentHistory.value
-          .filter(p => 
-            p.payment_type === 'rent' && 
-            new Date(p.payment_date).getTime() === new Date(currentTenant.last_payment_date).getTime()
-          )
-          .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
-        
-        const lastPayment = matchingPayments[matchingPayments.length - 1];
-        
-        if (lastPayment) {
-          paymentForm.value.due_date = calculateNextPaymentDate(new Date(lastPayment.due_date), currentTenant.payment_frequency);
-        } else {
-          paymentForm.value.due_date = new Date(currentTenant.check_in_date);
-        }
+  const currentTenant = store.tenants.find(t => t.id === currentTenantId.value);
+  if (!currentTenant) return;
+
+  if (value === 'rent') {
+    // 如果切换到租金类型，重新计算约定交租日期和金额
+    if (currentTenant.last_payment_date) {
+      const matchingPayments = currentPaymentHistory.value
+        .filter(p => 
+          p.payment_type === 'rent' && 
+          new Date(p.payment_date).getTime() === new Date(currentTenant.last_payment_date).getTime()
+        )
+        .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+      
+      const lastPayment = matchingPayments[matchingPayments.length - 1];
+      
+      if (lastPayment) {
+        paymentForm.value.due_date = calculateNextPaymentDate(new Date(lastPayment.due_date), currentTenant.payment_frequency);
       } else {
         paymentForm.value.due_date = new Date(currentTenant.check_in_date);
       }
+    } else {
+      paymentForm.value.due_date = new Date(currentTenant.check_in_date);
     }
+    // 设置租金金额
+    paymentForm.value.amount = calculateRentAmount(currentTenant.rent_amount, currentTenant.payment_frequency);
+  } else {
+    // 如果是其他费用类型，清空约定日期并设置金额为0
+    paymentForm.value.due_date = null;
+    paymentForm.value.amount = 0;
   }
 };
 
@@ -1178,6 +1297,107 @@ const availableYears = computed(() => {
   years.add(currentYear); // 确保当年总是可选的
   return Array.from(years).sort((a, b) => b - a); // 降序排列
 });
+
+// 获取当前租客信息
+const currentTenant = computed(() => {
+  return store.tenants.find(t => t.id === currentTenantId.value);
+});
+
+// 打印相关
+const printDialogVisible = ref(false);
+const printSection = ref(null);
+const printYear = ref(new Date().getFullYear());
+const printTenant = ref(null);
+const printPaymentData = ref([]);
+
+// 获取可打印年份选项
+const printYearOptions = computed(() => {
+  if (!printTenant.value) return [];
+  const years = new Set(printPaymentData.value.map(payment => 
+    new Date(payment.payment_date).getFullYear()
+  ));
+  const currentYear = new Date().getFullYear();
+  years.add(currentYear);
+  return Array.from(years).sort((a, b) => b - a);
+});
+
+// 显示打印对话框
+const showPrintDialog = async (tenant) => {
+  printTenant.value = tenant;
+  printYear.value = new Date().getFullYear();
+  try {
+    // 获取该租客的所有交租记录
+    const history = await store.getTenantPaymentHistory(tenant.id);
+    printPaymentData.value = history;
+    printDialogVisible.value = true;
+  } catch (error) {
+    console.error('获取交租历史失败:', error);
+    ElMessage.error('获取交租历史失败');
+  }
+};
+
+// 执行打印
+const printPaymentHistory = () => {
+  // 过滤选定年份的数据
+  printPaymentData.value = printPaymentData.value.filter(payment => 
+    new Date(payment.payment_date).getFullYear() === printYear.value
+  );
+
+  const printContent = printSection.value.innerHTML;
+  const originalContent = document.body.innerHTML;
+  
+  // 创建打印样式
+  const printStyles = `
+    <style>
+      @media print {
+        body {
+          padding: 20px;
+          font-family: Arial, sans-serif;
+        }
+        .print-header {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .print-footer {
+          margin-top: 20px;
+          text-align: right;
+          font-size: 12px;
+          color: #666;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 20px 0;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        th {
+          background-color: #f5f7fa;
+        }
+      }
+    </style>
+  `;
+
+  // 设置打印内容
+  document.body.innerHTML = printStyles + printContent;
+  
+  // 打印
+  window.print();
+  
+  // 恢复原始内容
+  document.body.innerHTML = originalContent;
+  
+  // 重新挂载 Vue 组件
+  window.location.reload();
+};
+
+// 跳转到打印页面
+const goPrintPage = (tenant) => {
+  router.push(`/print-payment-history/${tenant.id}`);
+};
 </script>
 
 <style scoped>
@@ -1292,5 +1512,26 @@ const availableYears = computed(() => {
 .overdue-payment {
   color: #f56c6c;
   font-weight: bold;
+}
+
+.amount-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthly-rent-hint {
+  color: #909399;
+  font-size: 13px;
+}
+
+.print-section {
+  display: none;
+}
+
+@media print {
+  .print-section {
+    display: block;
+  }
 }
 </style> 
