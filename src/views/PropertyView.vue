@@ -141,14 +141,6 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="交租方式" prop="payment_frequency">
-          <el-select v-model="propertyForm.payment_frequency">
-            <el-option label="按月" value="monthly" />
-            <el-option label="按半年" value="semi_annual" />
-            <el-option label="按季" value="quarterly" />
-            <el-option label="按年" value="yearly" />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -196,8 +188,7 @@ const propertyForm = ref({
   location_id: '',
   room_number: '',
   floor: 1,
-  facilities: [],
-  payment_frequency: 'monthly'
+  facilities: []
 });
 
 const rules = {
@@ -279,8 +270,7 @@ const showAddDialog = () => {
     location_id: '',
     room_number: '',
     floor: 1,
-    facilities: [],
-    payment_frequency: 'monthly'
+    facilities: []
   };
   dialogVisible.value = true;
 };
@@ -290,7 +280,6 @@ const editProperty = (property) => {
   propertyForm.value = {
     ...property,
     facilities: property.facilities ? property.facilities.map(f => f.id) : [],
-    payment_frequency: property.payment_frequency || 'monthly'
   };
   dialogVisible.value = true;
 };

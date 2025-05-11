@@ -594,30 +594,30 @@ ipcMain.handle('update-room', async (event, room) => {
   }
 
   return new Promise((resolve, reject) => {
-    db.run('BEGIN TRANSACTION', (err) => {
-      if (err) {
-        console.error('Error beginning transaction:', err);
-        reject(err);
-        return;
-      }
+    // Wrap everything in a single transaction
+    db.serialize(() => {
+      db.run('BEGIN TRANSACTION');
 
+      // Update room basic info
       db.run(
         'UPDATE rooms SET location_id = ?, room_number = ?, floor = ? WHERE id = ?',
         [room.location_id, room.room_number, room.floor, room.id],
-        function(err) {
+        (err) => {
           if (err) {
             console.error('Error updating room:', err);
-            db.run('ROLLBACK', () => reject(err));
-            return;
+            db.run('ROLLBACK');
+            return reject(err);
           }
 
-          db.run('DELETE FROM room_facilities WHERE room_id = ?', [room.id], function(err) {
+          // Delete existing facilities
+          db.run('DELETE FROM room_facilities WHERE room_id = ?', [room.id], (err) => {
             if (err) {
               console.error('Error deleting room facilities:', err);
-              db.run('ROLLBACK', () => reject(err));
-              return;
+              db.run('ROLLBACK');
+              return reject(err);
             }
 
+            // Insert new facilities if any
             if (room.facilities && room.facilities.length > 0) {
               const values = room.facilities.map(facilityId => [room.id, facilityId]);
               const placeholders = values.map(() => '(?, ?)').join(',');
@@ -625,26 +625,28 @@ ipcMain.handle('update-room', async (event, room) => {
               db.run(
                 `INSERT INTO room_facilities (room_id, facility_id) VALUES ${placeholders}`,
                 values.flat(),
-                function(err) {
+                (err) => {
                   if (err) {
                     console.error('Error inserting room facilities:', err);
-                    db.run('ROLLBACK', () => reject(err));
-                    return;
+                    db.run('ROLLBACK');
+                    return reject(err);
                   }
-                  
-                  db.run('COMMIT', function(err) {
+
+                  // Commit and fetch updated room
+                  db.run('COMMIT', (err) => {
                     if (err) {
                       console.error('Error committing transaction:', err);
-                      reject(err);
-                      return;
+                      db.run('ROLLBACK');
+                      return reject(err);
                     }
-                    
+
+                    // Fetch the updated room
                     db.all(`
                       SELECT r.*, 
                         l.name as location_name,
                         l.address as location_address,
-                        GROUP_CONCAT(f.id) as facility_ids,
-                        GROUP_CONCAT(f.name) as facility_names
+                        GROUP_CONCAT(DISTINCT f.id) as facility_ids,
+                        GROUP_CONCAT(DISTINCT f.name) as facility_names
                       FROM rooms r
                       LEFT JOIN locations l ON r.location_id = l.id
                       LEFT JOIN room_facilities rf ON r.id = rf.room_id
@@ -654,12 +656,10 @@ ipcMain.handle('update-room', async (event, room) => {
                     `, [room.id], (err, rows) => {
                       if (err) {
                         console.error('Error fetching updated room:', err);
-                        reject(err);
-                        return;
+                        return reject(err);
                       }
                       if (rows.length === 0) {
-                        reject(new Error('Room not found after update'));
-                        return;
+                        return reject(new Error('Room not found after update'));
                       }
                       const updatedRoom = {
                         ...rows[0],
@@ -674,19 +674,21 @@ ipcMain.handle('update-room', async (event, room) => {
                 }
               );
             } else {
-              db.run('COMMIT', function(err) {
+              // If no facilities to add, commit and fetch updated room
+              db.run('COMMIT', (err) => {
                 if (err) {
                   console.error('Error committing transaction:', err);
-                  reject(err);
-                  return;
+                  db.run('ROLLBACK');
+                  return reject(err);
                 }
-                
+
+                // Fetch the updated room
                 db.all(`
                   SELECT r.*, 
                     l.name as location_name,
                     l.address as location_address,
-                    GROUP_CONCAT(f.id) as facility_ids,
-                    GROUP_CONCAT(f.name) as facility_names
+                    GROUP_CONCAT(DISTINCT f.id) as facility_ids,
+                    GROUP_CONCAT(DISTINCT f.name) as facility_names
                   FROM rooms r
                   LEFT JOIN locations l ON r.location_id = l.id
                   LEFT JOIN room_facilities rf ON r.id = rf.room_id
@@ -696,12 +698,10 @@ ipcMain.handle('update-room', async (event, room) => {
                 `, [room.id], (err, rows) => {
                   if (err) {
                     console.error('Error fetching updated room:', err);
-                    reject(err);
-                    return;
+                    return reject(err);
                   }
                   if (rows.length === 0) {
-                    reject(new Error('Room not found after update'));
-                    return;
+                    return reject(new Error('Room not found after update'));
                   }
                   const updatedRoom = {
                     ...rows[0],

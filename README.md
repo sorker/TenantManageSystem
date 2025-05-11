@@ -101,6 +101,25 @@ The system uses SQLite with the following main tables:
 - 💾 Use transactions for database operations to ensure data consistency
   数据库操作请使用事务确保数据一致性
 
+## Screenshots 界面截图
+
+### Tenant Management 租户管理
+![Tenant Management](assets/租户管理.png)
+
+租户在预定缴纳租金时未缴费的7天前会变成红色状态提醒，如入住时已缴3月租金，但是3个月后的前7天还未缴费，最后交租日期会变为红色
+
+### Property Management 房间管理
+![Property Management](assets/房间管理.png)
+
+### Facility Management 设施管理
+![Facility Management](assets/设施管理.png)
+
+### Schedule Management 日程管理
+![Schedule Management](assets/日程管理.png)
+
+### Data Statistics 数据统计
+![Data Statistics](assets/数据统计.png)
+
 ## TODO List 待办事项
 
 The following features are currently under development:

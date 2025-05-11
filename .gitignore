@@ -6,3 +6,7 @@ node_modules
 .env.test
 
 images
+#日志文件夹
+logs
+#临时文件夹
+temp
