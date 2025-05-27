@@ -91,7 +91,7 @@
       </el-table-column>
       <el-table-column prop="room_id" label="房间号">
         <template #default="{ row }">
-          {{ row.room_number || '-' }}
+          {{ getRoomInfo(row.room_id) }}
         </template>
       </el-table-column>
       <el-table-column prop="is_active" label="状态">
@@ -135,7 +135,8 @@
             <el-button 
               size="small" 
               type="danger" 
-              @click="deleteTenant(row.id)"
+              v-if="isLatestPaymentRecord(row)"
+              @click="deletePaymentRecord(row.id)"
               :disabled="!!row.last_payment_date"
               :title="row.last_payment_date ? '已有交租记录，不能删除' : ''"
             >
@@ -340,6 +341,7 @@
               <el-button 
                 size="small" 
                 type="danger"
+                v-if="isLatestPaymentRecord(row)"
                 @click="deletePaymentRecord(row.id)"
               >
                 删除
@@ -1135,6 +1137,36 @@ const calculateNextPaymentDate = (lastPaymentDate, frequency) => {
 
 const deletePaymentRecord = async (paymentId) => {
   try {
+    // 获取当前租客的所有交租记录
+    const paymentHistory = await store.getTenantPaymentHistory(currentTenantId.value);
+    
+    // 找到要删除的记录
+    const paymentToDelete = paymentHistory.find(p => p.id === paymentId);
+    if (!paymentToDelete) {
+      throw new Error('未找到要删除的记录');
+    }
+
+    // 获取同类型的所有记录并按缴费日期和ID排序
+    const sameTypePayments = paymentHistory
+      .filter(p => p.payment_type === paymentToDelete.payment_type)
+      .sort((a, b) => {
+        const dateA = new Date(a.payment_date);
+        const dateB = new Date(b.payment_date);
+        if (dateB.getTime() === dateA.getTime()) {
+          return b.id - a.id;
+        }
+        return dateB.getTime() - dateA.getTime();
+      });
+
+    // 获取该类型最近一次缴费的记录
+    const latestPayment = sameTypePayments[0];
+
+    // 检查是否是最新记录
+    if (latestPayment.id !== paymentId) {
+      ElMessage.warning(`只能删除最近一次${getPaymentTypeLabel(paymentToDelete.payment_type)}记录`);
+      return;
+    }
+
     await ElMessageBox.confirm('确定要删除这条交租记录吗？', '警告', {
       type: 'warning'
     });
@@ -1271,7 +1303,9 @@ const isPaymentOverdue = async (tenant) => {
     }
     
     // 如果距离约定日期在7天之内（包括已过期7天内）且未超过周期减7天，则显示红色
-    return diffDays < (periodDays - 7);
+    // return diffDays < (periodDays - 7);
+    console.log(diffDays)
+    return diffDays < -7
   } catch (error) {
     console.error('获取交租历史失败:', error);
     return false;
@@ -1405,6 +1439,36 @@ const printPaymentHistory = () => {
 // 跳转到打印页面
 const goPrintPage = (tenant) => {
   router.push(`/print-payment-history/${tenant.id}`);
+};
+
+// 添加判断是否为最近一次缴费记录的方法
+const isLatestPaymentRecord = (payment) => {
+  if (!currentPaymentHistory.value || !payment) return false;
+  
+  // 获取同类型的所有记录并按缴费日期和ID排序
+  const sameTypePayments = currentPaymentHistory.value
+    .filter(p => p.payment_type === payment.payment_type)
+    .sort((a, b) => {
+      const dateA = new Date(a.payment_date);
+      const dateB = new Date(b.payment_date);
+      if (dateB.getTime() === dateA.getTime()) {
+        // 如果日期相同，按ID降序排序
+        return b.id - a.id;
+      }
+      return dateB.getTime() - dateA.getTime();
+    });
+  
+  // 获取该类型最近一次缴费的记录
+  const latestPayment = sameTypePayments[0];
+  
+  return latestPayment && latestPayment.id === payment.id;
+};
+
+// 添加获取房间信息的方法
+const getRoomInfo = (roomId) => {
+  const room = rooms.value.find(r => r.id === roomId);
+  if (!room) return '-';
+  return `${room.location_name} - ${room.room_number}`;
 };
 </script>
 
