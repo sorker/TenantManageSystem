@@ -1,76 +1,145 @@
 <template>
   <div class="tenant-container">
-    <!-- 顶部操作栏 -->
-    <div class="operation-bar">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-input
-            v-model="searchQuery"
-            placeholder="搜索租户姓名/电话"
-            clearable
-            @input="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="selectedStatus" placeholder="租户状态" @change="handleStatusChange">
-            <el-option label="全部" value="" />
-            <el-option label="活跃" value="active" />
-            <el-option label="非活跃" value="inactive" />
-          </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>新增租户
-          </el-button>
-        </el-col>
-      </el-row>
+    <div class="header-actions">
+      <el-button type="primary" @click="showAddDialog">
+        新增租客
+      </el-button>
+      <div class="filter-container">
+        <el-select
+          v-model="locationFilter"
+          placeholder="选择地址"
+          clearable
+          style="width: 200px; margin-right: 16px;"
+        >
+          <el-option
+            v-for="location in uniqueLocations"
+            :key="location"
+            :label="location"
+            :value="location"
+          />
+        </el-select>
+        <el-input
+          v-model="roomNumberFilter"
+          placeholder="输入房间号"
+          clearable
+          style="width: 200px;"
+        />
+      </div>
     </div>
 
-    <!-- 租户列表 -->
     <el-table
       v-loading="loading"
       :data="filteredTenants"
-      style="width: 100%"
-      border
+      style="width: 100%; margin-top: 20px;"
     >
-      <el-table-column prop="name" label="姓名" min-width="100" />
-      <el-table-column prop="phone" label="电话" min-width="120" />
-      <el-table-column prop="status" label="状态" width="100">
+      <el-table-column prop="name" label="姓名" />
+      <el-table-column label="隐私信息" width="80">
         <template #default="{ row }">
-          <el-tag :type="row.status === 'active' ? 'success' : 'info'">
-            {{ row.status === 'active' ? '活跃' : '非活跃' }}
+          <el-button 
+            size="small" 
+            type="info"
+            @click="showPrivacyInfo(row)"
+          >
+            查看
+          </el-button>
+        </template>
+      </el-table-column>
+      <el-table-column prop="check_in_date" label="入住时间" width="110">
+        <template #default="{ row }">
+          {{ row.check_in_date ? new Date(row.check_in_date).toLocaleDateString() : '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="rent_amount" label="租金" />
+      <el-table-column prop="payment_frequency" label="交租方式">
+        <template #default="{ row }">
+          {{ getPaymentFrequencyLabel(row.payment_frequency) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="last_payment_date" label="最后交租日期" width="140">
+        <template #default="{ row }">
+          <span :class="{ 'overdue-payment': row.isOverdue }">
+            {{ row.last_payment_date ? new Date(row.last_payment_date).toLocaleDateString() : '未交租' }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="交租历史" width="180">
+        <template #default="{ row }">
+          <el-button-group>
+            <el-button 
+              size="small" 
+              type="primary"
+              @click="showPaymentHistory(row)"
+            >
+              查看
+            </el-button>
+            <el-button 
+              size="small" 
+              type="success"
+              @click="showAddPaymentDialog(row)"
+            >
+              缴费
+            </el-button>
+            <el-button 
+              size="small" 
+              type="info"
+              @click="goPrintPage(row)"
+            >
+              打印
+            </el-button>
+          </el-button-group>
+        </template>
+      </el-table-column>
+      <el-table-column prop="room_id" label="房间号">
+        <template #default="{ row }">
+          {{ getRoomInfo(row.room_id) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="is_active" label="状态">
+        <template #default="{ row }">
+          <el-tag :type="row.is_active ? 'success' : 'info'">
+            {{ row.is_active ? '在租' : '已退租' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="room_number" label="房间号" width="100" />
-      <el-table-column prop="location_name" label="位置" min-width="120" />
-      <el-table-column prop="check_in_date" label="入住日期" width="120">
+      <el-table-column label="合同" width="80">
         <template #default="{ row }">
-          {{ formatDate(row.check_in_date) }}
+          <el-button 
+            size="small" 
+            type="primary"
+            @click="showContractImages(row)"
+          >
+            查看
+          </el-button>
         </template>
       </el-table-column>
-      <el-table-column prop="last_payment_date" label="最后支付日期" width="120">
-        <template #default="{ row }">
-          {{ row.last_payment_date ? formatDate(row.last_payment_date) : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" min-width="280">
         <template #default="{ row }">
           <el-button-group>
-            <el-button type="primary" link @click="handleEdit(row)">
-              编辑
+            <el-button size="small" @click="editTenant(row)">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="warning" 
+              v-if="row.is_active"
+              @click="terminateContract(row)"
+            >
+              退租
             </el-button>
-            <el-button type="success" link @click="handleViewPayments(row)">
-              支付记录
+            <el-button 
+              size="small" 
+              type="success" 
+              v-if="!row.is_active"
+              @click="renewContract(row)"
+            >
+              续租
             </el-button>
-            <el-button type="warning" link @click="handleAddPayment(row)">
-              添加支付
-            </el-button>
-            <el-button type="danger" link @click="handleDelete(row)">
+            <el-button 
+              size="small" 
+              type="danger" 
+              v-if="isLatestPaymentRecord(row)"
+              @click="deletePaymentRecord(row.id)"
+              :disabled="!!row.last_payment_date"
+              :title="row.last_payment_date ? '已有交租记录，不能删除' : ''"
+            >
               删除
             </el-button>
           </el-button-group>
@@ -78,69 +147,61 @@
       </el-table-column>
     </el-table>
 
-    <!-- 分页 -->
-    <div class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="total"
-        layout="total, sizes, prev, pager, next"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-
-    <!-- 新增/编辑对话框 -->
+    <!-- Add/Edit Dialog -->
     <el-dialog
       v-model="dialogVisible"
-      :title="dialogType === 'add' ? '新增租户' : '编辑租户'"
+      :title="isEditing ? '编辑租客' : '新增租客'"
       width="500px"
     >
       <el-form
         ref="formRef"
-        :model="form"
+        :model="tenantForm"
         :rules="rules"
-        label-width="80px"
+        label-width="100px"
       >
         <el-form-item label="姓名" prop="name">
-          <el-input v-model="form.name" />
+          <el-input v-model="tenantForm.name" />
         </el-form-item>
         <el-form-item label="电话" prop="phone">
-          <el-input v-model="form.phone" />
+          <el-input v-model="tenantForm.phone" />
         </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" />
+        <el-form-item label="身份证号" prop="id_number">
+          <el-input v-model="tenantForm.id_number" />
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" placeholder="请选择状态">
-            <el-option label="活跃" value="active" />
-            <el-option label="非活跃" value="inactive" />
+        <el-form-item label="微信号" prop="wechat_id">
+          <el-input v-model="tenantForm.wechat_id" />
+        </el-form-item>
+        <el-form-item label="入住时间" prop="check_in_date">
+          <el-date-picker
+            v-model="tenantForm.check_in_date"
+            type="date"
+            placeholder="选择日期"
+          />
+        </el-form-item>
+        <el-form-item label="租金" prop="rent_amount">
+          <el-input-number v-model="tenantForm.rent_amount" :min="0" />
+        </el-form-item>
+        <el-form-item label="交租方式" prop="payment_frequency">
+          <el-select v-model="tenantForm.payment_frequency">
+            <el-option label="按月" value="monthly" />
+            <el-option label="按半年" value="semi_annual" />
+            <el-option label="按季" value="quarterly" />
+            <el-option label="按年" value="yearly" />
           </el-select>
         </el-form-item>
-        <el-form-item label="位置" prop="location_id">
-          <el-select v-model="form.location_id" placeholder="请选择位置" @change="handleLocationSelect">
-            <el-option
-              v-for="location in locations"
-              :key="location.id"
-              :label="location.name"
-              :value="location.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="房间" prop="room_id">
-          <el-select v-model="form.room_id" placeholder="请选择房间">
+        <el-form-item label="房间号" prop="room_id">
+          <el-select v-model="tenantForm.room_id" placeholder="请选择房间">
             <el-option
               v-for="room in availableRooms"
               :key="room.id"
-              :label="room.room_number"
+              :label="`${room.location_name} - ${room.room_number}`"
               :value="room.id"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="入住日期" prop="check_in_date">
+        <el-form-item label="最后交租日期" prop="last_payment_date">
           <el-date-picker
-            v-model="form.check_in_date"
+            v-model="tenantForm.last_payment_date"
             type="date"
             placeholder="选择日期"
           />
@@ -149,59 +210,127 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">
+          <el-button type="primary" @click="submitForm">
             确定
           </el-button>
         </span>
       </template>
     </el-dialog>
 
-    <!-- 支付记录对话框 -->
+    <!-- Contract Images Dialog -->
     <el-dialog
-      v-model="paymentDialogVisible"
-      title="支付记录"
+      v-model="contractImagesVisible"
+      title="合同文件"
       width="800px"
+      class="contract-dialog"
     >
-      <el-table :data="currentTenantPayments" border>
-        <el-table-column prop="payment_date" label="支付日期" width="180">
-          <template #default="{ row }">
-            {{ formatDate(row.payment_date) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="amount" label="金额" width="120">
-          <template #default="{ row }">
-            ¥{{ row.amount.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="payment_type" label="类型" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getPaymentTypeTag(row.payment_type)">
-              {{ getPaymentTypeLabel(row.payment_type) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="payment_method" label="支付方式" width="120">
-          <template #default="{ row }">
-            {{ getPaymentMethodLabel(row.payment_method) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-      </el-table>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="paymentDialogVisible = false">关闭</el-button>
-          <el-button type="primary" @click="handlePrintPayments">
-            打印记录
-          </el-button>
-        </span>
-      </template>
+      <div class="contract-images-container">
+        <div v-if="currentContractImages.length > 0" class="contract-preview">
+          <el-carousel 
+            :interval="4000" 
+            type="card" 
+            height="400px"
+            indicator-position="outside"
+            :autoplay="false"
+          >
+            <el-carousel-item v-for="image in currentContractImages" :key="image.id">
+              <div class="image-container">
+                <img 
+                  :src="image.url" 
+                  class="contract-image" 
+                  @error="handleImageError"
+                  :alt="image.name"
+                />
+                <div class="image-info">
+                  <span class="image-name">{{ image.name }}</span>
+                </div>
+              </div>
+            </el-carousel-item>
+          </el-carousel>
+        </div>
+        <el-empty v-else description="暂无合同文件" />
+      </div>
     </el-dialog>
 
-    <!-- 添加支付对话框 -->
+    <!-- Privacy Info Dialog -->
     <el-dialog
-      v-model="addPaymentDialogVisible"
-      title="添加支付记录"
+      v-model="privacyInfoVisible"
+      title="隐私信息"
       width="500px"
+    >
+      <div v-if="currentTenant" class="privacy-info">
+        <p><strong>姓名：</strong>{{ currentTenant.name }}</p>
+        <p><strong>电话：</strong>{{ currentTenant.phone }}</p>
+        <p><strong>身份证号：</strong>{{ currentTenant.id_number }}</p>
+        <p><strong>微信号：</strong>{{ currentTenant.wechat_id }}</p>
+      </div>
+    </el-dialog>
+
+    <!-- Payment History Dialog -->
+    <el-dialog
+      v-model="paymentHistoryVisible"
+      :title="`${currentTenant?.name || ''} 的缴费历史`"
+      width="70%"
+    >
+      <div class="payment-history-content">
+        <div class="payment-history-header">
+          <div class="tenant-info">
+            <p>房间号：{{ currentTenant?.room_number }}</p>
+            <p>租金：{{ currentTenant?.rent_amount }}元/{{ getPaymentFrequencyLabel(currentTenant?.payment_frequency) }}</p>
+          </div>
+          <el-button type="primary" @click="showAddPaymentDialog">
+            新增缴费
+          </el-button>
+        </div>
+        
+        <el-table :data="currentPaymentHistory" style="width: 100%">
+          <el-table-column prop="payment_date" label="缴费日期" width="120">
+            <template #default="{ row }">
+              {{ new Date(row.payment_date).toLocaleDateString() }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="due_date" label="约定日期" width="120">
+            <template #default="{ row }">
+              {{ row.due_date ? new Date(row.due_date).toLocaleDateString() : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="amount" label="金额" width="100">
+            <template #default="{ row }">
+              {{ row.amount }}元
+            </template>
+          </el-table-column>
+          <el-table-column prop="payment_type" label="类型" width="100">
+            <template #default="{ row }">
+              {{ getPaymentTypeLabel(row.payment_type) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="payment_method" label="方式" width="100">
+            <template #default="{ row }">
+              {{ getPaymentMethodLabel(row.payment_method) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="notes" label="备注" min-width="120" />
+          <el-table-column label="操作" width="80" fixed="right">
+            <template #default="{ row }">
+              <el-button 
+                v-if="isLatestPaymentOfType(row)"
+                type="danger" 
+                size="small"
+                @click="deletePaymentRecord(row.id)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-dialog>
+
+    <!-- Add Payment Dialog -->
+    <el-dialog
+      v-model="addPaymentVisible"
+      title="新增交租记录"
+      width="90%"
     >
       <el-form
         ref="paymentFormRef"
@@ -209,50 +338,68 @@
         :rules="paymentRules"
         label-width="100px"
       >
-        <el-form-item label="支付日期" prop="payment_date">
+        <el-form-item label="交租日期" prop="payment_date">
           <el-date-picker
             v-model="paymentForm.payment_date"
-            type="datetime"
-            placeholder="选择日期时间"
+            type="date"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="费用类别" prop="payment_type">
+          <el-select v-model="paymentForm.payment_type" @change="handlePaymentTypeChange" style="width: 100%">
+            <el-option label="租金" value="rent" />
+            <el-option label="水费" value="water" />
+            <el-option label="电费" value="electricity" />
+            <el-option label="维修费" value="maintenance" />
+          </el-select>
+        </el-form-item>
+        <el-form-item 
+          label="约定交租日期" 
+          prop="due_date"
+          v-if="paymentForm.payment_type === 'rent'"
+        >
+          <el-date-picker
+            v-model="paymentForm.due_date"
+            type="date"
+            placeholder="选择日期"
+            :disabled="paymentForm.payment_type === 'rent'"
+            style="width: 100%"
           />
         </el-form-item>
         <el-form-item label="金额" prop="amount">
-          <el-input-number
-            v-model="paymentForm.amount"
-            :precision="2"
-            :step="100"
-            :min="0"
-          />
-        </el-form-item>
-        <el-form-item label="支付类型" prop="payment_type">
-          <el-select v-model="paymentForm.payment_type" placeholder="请选择类型">
-            <el-option label="租金" value="rent" />
-            <el-option label="押金" value="deposit" />
-            <el-option label="水电费" value="utility" />
-            <el-option label="其他" value="other" />
-          </el-select>
+          <div class="amount-input-group">
+            <el-input-number 
+              v-model="paymentForm.amount" 
+              :min="0" 
+              :precision="2"
+              style="width: 100%"
+            />
+            <span v-if="paymentForm.payment_type === 'rent'" class="monthly-rent-hint">
+              (月租:¥{{ currentTenant?.rent_amount || 0 }})
+            </span>
+          </div>
         </el-form-item>
         <el-form-item label="支付方式" prop="payment_method">
-          <el-select v-model="paymentForm.payment_method" placeholder="请选择支付方式">
+          <el-select v-model="paymentForm.payment_method" style="width: 100%">
             <el-option label="现金" value="cash" />
-            <el-option label="银行转账" value="bank_transfer" />
+            <el-option label="微信" value="wechat" />
             <el-option label="支付宝" value="alipay" />
-            <el-option label="微信支付" value="wechat" />
-            <el-option label="其他" value="other" />
+            <el-option label="银行转账" value="bank" />
           </el-select>
         </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="paymentForm.description"
+        <el-form-item label="备注" prop="notes">
+          <el-input 
+            v-model="paymentForm.notes"
             type="textarea"
-            :rows="3"
+            :rows="2"
           />
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="addPaymentDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handlePaymentSubmit">
+          <el-button @click="addPaymentVisible = false">取消</el-button>
+          <el-button type="primary" @click="submitPayment">
             确定
           </el-button>
         </span>
@@ -262,322 +409,331 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useTenantStore } from '@/stores/tenantStore'
-import { usePaymentStore } from '@/stores/paymentStore'
-import { useLocationStore } from '@/stores/locationStore'
-import { useRoomStore } from '@/stores/roomStore'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
-import dayjs from 'dayjs'
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useTenantStore } from '../stores/tenant';
+import { ElMessage, ElMessageBox } from 'element-plus';
 
-// Router
-const router = useRouter()
+const router = useRouter();
+const store = useTenantStore();
 
-// Store
-const tenantStore = useTenantStore()
-const paymentStore = usePaymentStore()
-const locationStore = useLocationStore()
-const roomStore = useRoomStore()
+// 状态变量
+const loading = ref(false);
+const dialogVisible = ref(false);
+const isEditing = ref(false);
+const contractImagesVisible = ref(false);
+const privacyInfoVisible = ref(false);
+const paymentHistoryVisible = ref(false);
+const addPaymentVisible = ref(false);
+const currentTenant = ref(null);
+const currentContractImages = ref([]);
+const currentPaymentHistory = ref([]);
+const locationFilter = ref('');
+const roomNumberFilter = ref('');
 
-// 状态
-const loading = ref(false)
-const searchQuery = ref('')
-const selectedStatus = ref('')
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const dialogVisible = ref(false)
-const dialogType = ref('add')
-const formRef = ref(null)
-const paymentDialogVisible = ref(false)
-const addPaymentDialogVisible = ref(false)
-const paymentFormRef = ref(null)
-const currentTenant = ref(null)
-
-// 表单数据
-const form = ref({
+// 表单相关
+const formRef = ref(null);
+const paymentFormRef = ref(null);
+const tenantForm = ref({
   name: '',
   phone: '',
-  email: '',
-  status: 'active',
-  location_id: null,
-  room_id: null,
-  check_in_date: null
-})
+  id_number: '',
+  wechat_id: '',
+  check_in_date: '',
+  rent_amount: 0,
+  payment_frequency: 'monthly',
+  room_id: '',
+  last_payment_date: ''
+});
 
-// 支付表单数据
 const paymentForm = ref({
   payment_date: '',
+  payment_type: 'rent',
+  due_date: '',
   amount: 0,
-  payment_type: '',
-  payment_method: '',
-  description: ''
-})
+  payment_method: 'cash',
+  notes: ''
+});
 
 // 表单验证规则
 const rules = {
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  phone: [
-    { required: true, message: '请输入电话', trigger: 'blur' },
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
-  ],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
-  ],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
-  location_id: [{ required: true, message: '请选择位置', trigger: 'change' }],
-  room_id: [{ required: true, message: '请选择房间', trigger: 'change' }],
-  check_in_date: [{ required: true, message: '请选择入住日期', trigger: 'change' }]
-}
+  phone: [{ required: true, message: '请输入电话', trigger: 'blur' }],
+  id_number: [{ required: true, message: '请输入身份证号', trigger: 'blur' }],
+  check_in_date: [{ required: true, message: '请选择入住时间', trigger: 'change' }],
+  rent_amount: [{ required: true, message: '请输入租金', trigger: 'blur' }],
+  payment_frequency: [{ required: true, message: '请选择交租方式', trigger: 'change' }],
+  room_id: [{ required: true, message: '请选择房间', trigger: 'change' }]
+};
 
-// 支付表单验证规则
 const paymentRules = {
-  payment_date: [{ required: true, message: '请选择支付日期', trigger: 'change' }],
+  payment_date: [{ required: true, message: '请选择交租日期', trigger: 'change' }],
+  payment_type: [{ required: true, message: '请选择费用类别', trigger: 'change' }],
   amount: [{ required: true, message: '请输入金额', trigger: 'blur' }],
-  payment_type: [{ required: true, message: '请选择支付类型', trigger: 'change' }],
   payment_method: [{ required: true, message: '请选择支付方式', trigger: 'change' }]
-}
+};
 
 // 计算属性
-const locations = computed(() => locationStore.locations)
+const uniqueLocations = computed(() => {
+  return store.uniqueLocations;
+});
+
 const availableRooms = computed(() => {
-  if (!form.value.location_id) {
-    return [];
-  }
-  try {
-    const rooms = roomStore.roomsByLocation(form.value.location_id);
-    return Array.isArray(rooms) ? rooms : [];
-  } catch (error) {
-    console.error('获取房间列表失败:', error);
-    return [];
-  }
-})
+  return store.availableRooms;
+});
 
 const filteredTenants = computed(() => {
-  let tenants = tenantStore.tenants;
-
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase();
-    tenants = tenants.filter(tenant => 
-      tenant.name.toLowerCase().includes(query) ||
-      tenant.phone.includes(query)
-    );
+  let tenants = store.tenants;
+  
+  if (locationFilter.value) {
+    tenants = tenants.filter(t => {
+      const room = store.getRoomById(t.room_id);
+      return room?.location_name === locationFilter.value;
+    });
   }
-
-  if (selectedStatus.value) {
-    tenants = tenants.filter(tenant => tenant.status === selectedStatus.value);
+  
+  if (roomNumberFilter.value) {
+    tenants = tenants.filter(t => {
+      const room = store.getRoomById(t.room_id);
+      return room?.room_number.includes(roomNumberFilter.value);
+    });
   }
-
+  
   return tenants;
-})
-
-const currentTenantPayments = computed(() => 
-  paymentStore.paymentsByTenant(currentTenant.value?.id)
-)
+});
 
 // 方法
-const formatDate = (date) => {
-  return dayjs(date).format('YYYY-MM-DD')
-}
-
-const getPaymentTypeLabel = (type) => {
-  const types = {
-    rent: '租金',
-    deposit: '押金',
-    utility: '水电费',
-    other: '其他'
-  }
-  return types[type] || type
-}
-
-const getPaymentTypeTag = (type) => {
-  const types = {
-    rent: 'success',
-    deposit: 'warning',
-    utility: 'info',
-    other: ''
-  }
-  return types[type] || ''
-}
-
-const getPaymentMethodLabel = (method) => {
-  const methods = {
-    cash: '现金',
-    bank_transfer: '银行转账',
-    alipay: '支付宝',
-    wechat: '微信支付',
-    other: '其他'
-  }
-  return methods[method] || method
-}
-
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchTenants()
-}
-
-const handleStatusChange = () => {
-  currentPage.value = 1
-  fetchTenants()
-}
-
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  fetchTenants()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchTenants()
-}
-
-const handleLocationSelect = async () => {
-  form.value.room_id = null;
-  if (form.value.location_id) {
-    try {
-      await roomStore.fetchRooms();
-    } catch (error) {
-      ElMessage.error('获取房间列表失败');
-    }
-  }
-}
-
-const handleAdd = () => {
-  dialogType.value = 'add'
-  form.value = {
+const showAddDialog = () => {
+  isEditing.value = false;
+  tenantForm.value = {
     name: '',
     phone: '',
-    email: '',
-    status: 'active',
-    location_id: null,
-    room_id: null,
-    check_in_date: null
-  }
-  dialogVisible.value = true
-}
+    id_number: '',
+    wechat_id: '',
+    check_in_date: '',
+    rent_amount: 0,
+    payment_frequency: 'monthly',
+    room_id: '',
+    last_payment_date: ''
+  };
+  dialogVisible.value = true;
+};
 
-const handleEdit = (row) => {
-  dialogType.value = 'edit'
-  form.value = {
-    ...row,
-    check_in_date: row.check_in_date ? new Date(row.check_in_date) : null
-  }
-  dialogVisible.value = true
-}
+const editTenant = (tenant) => {
+  isEditing.value = true;
+  tenantForm.value = { ...tenant };
+  dialogVisible.value = true;
+};
 
-const handleDelete = async (row) => {
-  try {
-    await ElMessageBox.confirm('确定要删除这个租户吗？', '提示', {
-      type: 'warning'
-    })
-    await tenantStore.deleteTenant(row.id)
-    ElMessage.success('删除成功')
-    fetchTenants()
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error(error.response?.data?.message || '删除失败')
-    }
-  }
-}
-
-const handleSubmit = async () => {
-  if (!formRef.value) return
+const submitForm = async () => {
+  if (!formRef.value) return;
   
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        if (isEditing.value) {
+          await store.updateTenant(tenantForm.value);
+          ElMessage.success('更新成功');
+        } else {
+          await store.addTenant(tenantForm.value);
+          ElMessage.success('添加成功');
+        }
+        dialogVisible.value = false;
+        fetchData();
+      } catch (error) {
+        ElMessage.error(error.message || '操作失败');
+      }
+    }
+  });
+};
+
+const showContractImages = async (tenant) => {
+  currentTenant.value = tenant;
   try {
-    await formRef.value.validate()
-    
-    const submitData = {
-      ...form.value,
-      check_in_date: form.value.check_in_date ? dayjs(form.value.check_in_date).format('YYYY-MM-DD') : null
-    }
-    
-    if (dialogType.value === 'add') {
-      await tenantStore.createTenant(submitData)
-      ElMessage.success('创建成功')
-    } else {
-      await tenantStore.updateTenant(submitData.id, submitData)
-      ElMessage.success('更新成功')
-    }
-    
-    dialogVisible.value = false
-    fetchTenants()
+    currentContractImages.value = await store.getContractImages(tenant.id);
+    contractImagesVisible.value = true;
   } catch (error) {
-    console.error('操作失败:', error)
-    ElMessage.error(error.response?.data?.message || '操作失败')
+    ElMessage.error('获取合同文件失败');
   }
-}
+};
 
-const handleViewPayments = async (row) => {
-  currentTenant.value = row
-  await paymentStore.fetchPayments({ tenant_id: row.id })
-  paymentDialogVisible.value = true
-}
+const showPrivacyInfo = (tenant) => {
+  currentTenant.value = tenant;
+  privacyInfoVisible.value = true;
+};
 
-const handleAddPayment = (row) => {
-  currentTenant.value = row
+const showPaymentHistory = async (tenant) => {
+  currentTenant.value = tenant;
+  try {
+    currentPaymentHistory.value = await store.getPaymentHistory(tenant.id);
+    paymentHistoryVisible.value = true;
+  } catch (error) {
+    ElMessage.error('获取缴费历史失败');
+  }
+};
+
+const showAddPaymentDialog = (tenant) => {
+  currentTenant.value = tenant;
   paymentForm.value = {
     payment_date: new Date(),
-    amount: 0,
     payment_type: 'rent',
+    due_date: '',
+    amount: tenant.rent_amount,
     payment_method: 'cash',
-    description: ''
-  }
-  addPaymentDialogVisible.value = true
-}
+    notes: ''
+  };
+  addPaymentVisible.value = true;
+};
 
-const handlePaymentSubmit = async () => {
-  if (!paymentFormRef.value) return
+const submitPayment = async () => {
+  if (!paymentFormRef.value) return;
   
+  await paymentFormRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        await store.addPayment({
+          ...paymentForm.value,
+          tenant_id: currentTenant.value.id
+        });
+        ElMessage.success('添加缴费记录成功');
+        addPaymentVisible.value = false;
+        fetchData();
+      } catch (error) {
+        ElMessage.error(error.message || '添加缴费记录失败');
+      }
+    }
+  });
+};
+
+const terminateContract = async (tenant) => {
   try {
-    await paymentFormRef.value.validate()
-    
-    await paymentStore.createPayment({
-      ...paymentForm.value,
-      tenant_id: currentTenant.value.id
-    })
-    
-    ElMessage.success('添加支付记录成功')
-    addPaymentDialogVisible.value = false
-    await paymentStore.fetchPayments({ tenant_id: currentTenant.value.id })
+    await ElMessageBox.confirm('确定要终止该租户的合同吗？', '提示', {
+      type: 'warning'
+    });
+    await store.terminateContract(tenant.id);
+    ElMessage.success('退租成功');
+    fetchData();
   } catch (error) {
-    ElMessage.error('操作失败')
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '退租失败');
+    }
   }
-}
+};
 
-const handlePrintPayments = () => {
-  router.push(`/print-payment-history/${currentTenant.value.id}`)
-}
-
-const fetchTenants = async () => {
-  loading.value = true
+const renewContract = async (tenant) => {
   try {
-    await tenantStore.fetchTenants()
-    total.value = tenantStore.tenants.length
+    await ElMessageBox.confirm('确定要续租该租户的合同吗？', '提示', {
+      type: 'warning'
+    });
+    await store.renewContract(tenant.id);
+    ElMessage.success('续租成功');
+    fetchData();
   } catch (error) {
-    console.error('获取租户列表失败:', error)
-    ElMessage.error(error.response?.data?.message || '获取租户列表失败')
-  } finally {
-    loading.value = false
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '续租失败');
+    }
   }
-}
+};
 
-// 初始化
-onMounted(async () => {
+const deletePaymentRecord = async (id) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该缴费记录吗？', '提示', {
+      type: 'warning'
+    });
+    await store.deletePaymentRecord(id);
+    ElMessage.success('删除成功');
+    fetchData();
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败');
+    }
+  }
+};
+
+const goPrintPage = (tenant) => {
+  router.push({
+    name: 'PrintPaymentHistory',
+    params: { id: tenant.id }
+  });
+};
+
+const getRoomInfo = (roomId) => {
+  const room = store.getRoomById(roomId);
+  return room ? `${room.location_name} - ${room.room_number}` : '-';
+};
+
+const getPaymentFrequencyLabel = (frequency) => {
+  const map = {
+    monthly: '按月',
+    semi_annual: '按半年',
+    quarterly: '按季',
+    yearly: '按年'
+  };
+  return map[frequency] || frequency;
+};
+
+const getPaymentTypeLabel = (type) => {
+  const map = {
+    rent: '租金',
+    water: '水费',
+    electricity: '电费',
+    maintenance: '维修费'
+  };
+  return map[type] || type;
+};
+
+const getPaymentMethodLabel = (method) => {
+  const map = {
+    cash: '现金',
+    wechat: '微信',
+    alipay: '支付宝',
+    bank: '银行转账'
+  };
+  return map[method] || method;
+};
+
+const isLatestPaymentOfType = (payment) => {
+  if (!currentPaymentHistory.value.length) return false;
+  const sameTypePayments = currentPaymentHistory.value.filter(p => p.payment_type === payment.payment_type);
+  return sameTypePayments[0]?.id === payment.id;
+};
+
+const handlePaymentTypeChange = () => {
+  if (paymentForm.value.payment_type === 'rent') {
+    paymentForm.value.amount = currentTenant.value?.rent_amount || 0;
+  } else {
+    paymentForm.value.amount = 0;
+  }
+};
+
+const handleImageError = (e) => {
+  e.target.src = '/placeholder.png';
+};
+
+// 数据获取
+const fetchData = async () => {
+  loading.value = true;
   try {
     await Promise.all([
-      locationStore.fetchLocations(),
-      roomStore.fetchRooms(),
-      fetchTenants()
-    ])
+      store.fetchTenants(),
+      store.fetchRooms()
+    ]);
   } catch (error) {
-    console.error('初始化数据失败:', error)
-    ElMessage.error('初始化数据失败')
+    ElMessage.error('获取数据失败');
+  } finally {
+    loading.value = false;
   }
-})
+};
+
+// 生命周期钩子
+onMounted(() => {
+  fetchData();
+});
+
+// 监听筛选条件变化
+watch([locationFilter, roomNumberFilter], () => {
+  fetchData();
+});
 </script>
 
 <style scoped>
@@ -585,19 +741,83 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.operation-bar {
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
 
-.pagination-container {
-  margin-top: 20px;
+.filter-container {
   display: flex;
-  justify-content: flex-end;
+  gap: 16px;
 }
 
-.dialog-footer {
+.overdue-payment {
+  color: #f56c6c;
+}
+
+.contract-dialog {
+  .contract-images-container {
+    .contract-preview {
+      .image-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        
+        .contract-image {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+        }
+        
+        .image-info {
+          margin-top: 8px;
+          text-align: center;
+          
+          .image-name {
+            color: #606266;
+            font-size: 14px;
+          }
+        }
+      }
+    }
+  }
+}
+
+.privacy-info {
+  p {
+    margin: 8px 0;
+    line-height: 1.5;
+  }
+}
+
+.payment-history-content {
+  .payment-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .tenant-info {
+      p {
+        margin: 4px 0;
+        color: #606266;
+      }
+    }
+  }
+}
+
+.amount-input-group {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  
+  .monthly-rent-hint {
+    color: #909399;
+    font-size: 12px;
+  }
 }
 </style> 

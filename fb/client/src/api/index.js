@@ -44,6 +44,9 @@ api.interceptors.response.use(
   }
 );
 
+// 导出 api 实例
+export { api };
+
 // 租户相关 API
 export const tenantApi = {
   getList: () => api.get('/tenants/'),

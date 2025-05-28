@@ -13,3 +13,4 @@ temp
 contracts
 dist
 release
+*.zip

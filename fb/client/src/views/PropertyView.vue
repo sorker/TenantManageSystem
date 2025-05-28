@@ -1,130 +1,119 @@
 <template>
   <div class="property-container">
-    <!-- 顶部操作栏 -->
-    <div class="operation-bar">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-input
-            v-model="searchQuery"
-            placeholder="搜索房间号"
-            clearable
-            @input="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="selectedLocation" placeholder="选择位置" @change="handleLocationChange">
-            <el-option label="全部" value="" />
-            <el-option
-              v-for="location in locations"
-              :key="location.id"
-              :label="location.name"
-              :value="location.id"
-            />
-          </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="selectedStatus" placeholder="房间状态" @change="handleStatusChange">
-            <el-option label="全部" value="" />
-            <el-option label="空闲" value="available" />
-            <el-option label="已租" value="occupied" />
-            <el-option label="维护中" value="maintenance" />
-          </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>新增房间
-          </el-button>
-        </el-col>
-      </el-row>
+    <div class="header-actions">
+      <el-button type="primary" @click="showAddDialog">
+        新增房屋
+      </el-button>
+      <div class="filter-container">
+        <el-select
+          v-model="locationFilter"
+          placeholder="选择地址"
+          clearable
+          style="width: 200px; margin-right: 16px;"
+        >
+          <el-option
+            v-for="location in locations"
+            :key="location.id"
+            :label="location.name"
+            :value="location.id"
+          />
+        </el-select>
+        <el-input
+          v-model="roomNumberFilter"
+          placeholder="输入房间号"
+          clearable
+          style="width: 200px;"
+        />
+      </div>
     </div>
 
-    <!-- 房间列表 -->
     <el-table
       v-loading="loading"
-      :data="filteredRooms"
-      style="width: 100%"
-      border
+      :data="filteredProperties"
+      style="width: 100%; margin-top: 20px;"
     >
-      <el-table-column prop="room_number" label="房间号" width="100" />
-      <el-table-column prop="location_name" label="位置" min-width="120" />
-      <el-table-column prop="status" label="状态" width="100">
+      <el-table-column label="位置">
         <template #default="{ row }">
-          <el-tag :type="getStatusTag(row.status)">
-            {{ getStatusLabel(row.status) }}
+          <div>
+            <div>{{ row.location_name }}</div>
+            <div class="location-address">{{ row.location_address }}</div>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="room_number" label="房间号" />
+      <el-table-column prop="floor" label="楼层" />
+      <el-table-column label="当前租客">
+        <template #default="{ row }">
+          <el-tag :type="row.current_tenant_id ? 'success' : 'info'">
+            {{ row.current_tenant_id ? row.current_tenant_name : '空置' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="floor" label="楼层" width="80" />
-      <el-table-column prop="area" label="面积(㎡)" width="100" />
-      <el-table-column prop="price" label="价格(元/月)" width="120">
+      <el-table-column label="设施">
         <template #default="{ row }">
-          ¥{{ row.price.toFixed(2) }}
+          <div class="facility-tags">
+            <el-tag 
+              v-for="facility in row.facilities" 
+              :key="facility.id"
+              style="margin-right: 4px; margin-bottom: 4px;"
+            >
+              {{ facility.name }}
+              <el-button
+                v-if="facility.description"
+                type="text"
+                size="small"
+                @click="showFacilityDetails(facility)"
+                style="margin-left: 4px; padding: 0 4px;"
+              >
+                <el-icon><View /></el-icon>
+              </el-button>
+            </el-tag>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column prop="facilities" label="设施" min-width="200">
-        <template #default="{ row }">
-          <el-tag
-            v-for="facility in row.facilities"
-            :key="facility.id"
-            class="facility-tag"
-            size="small"
-          >
-            {{ facility.name }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="description" label="描述" min-width="200" show-overflow-tooltip />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="280">
         <template #default="{ row }">
           <el-button-group>
-            <el-button type="primary" link @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="success" link @click="handleManageFacilities(row)">
-              管理设施
-            </el-button>
-            <el-button type="danger" link @click="handleDelete(row)">
+            <el-button size="small" @click="editProperty(row)">编辑</el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deleteProperty(row.id)"
+              :disabled="!!row.current_tenant_id"
+              :title="row.current_tenant_id ? '有租客记录的房间不能删除' : ''"
+            >
               删除
+            </el-button>
+            <el-button 
+              size="small" 
+              type="primary" 
+              @click="viewTenants(row.id)"
+            >
+              查看租客
             </el-button>
           </el-button-group>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 分页 -->
-    <div class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="total"
-        layout="total, sizes, prev, pager, next"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
-
-    <!-- 新增/编辑对话框 -->
+    <!-- Add/Edit Dialog -->
     <el-dialog
       v-model="dialogVisible"
-      :title="dialogType === 'add' ? '新增房间' : '编辑房间'"
+      :title="isEditing ? '编辑房屋' : '新增房屋'"
       width="500px"
     >
       <el-form
         ref="formRef"
-        :model="form"
+        :model="propertyForm"
         :rules="rules"
-        label-width="80px"
+        label-width="100px"
       >
-        <el-form-item label="房间号" prop="room_number">
-          <el-input v-model="form.room_number" />
-        </el-form-item>
         <el-form-item label="位置" prop="location_id">
-          <el-select v-model="form.location_id" placeholder="请选择位置">
+          <el-select
+            v-model="propertyForm.location_id"
+            placeholder="选择位置"
+            style="width: 100%"
+          >
             <el-option
               v-for="location in locations"
               :key="location.id"
@@ -133,291 +122,244 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态" prop="status">
-          <el-select v-model="form.status" placeholder="请选择状态">
-            <el-option label="空闲" value="available" />
-            <el-option label="已租" value="occupied" />
-            <el-option label="维护中" value="maintenance" />
-          </el-select>
+        <el-form-item label="房间号" prop="room_number">
+          <el-input v-model="propertyForm.room_number" />
         </el-form-item>
         <el-form-item label="楼层" prop="floor">
-          <el-input-number v-model="form.floor" :min="1" />
+          <el-input-number v-model="propertyForm.floor" :min="1" />
         </el-form-item>
-        <el-form-item label="面积" prop="area">
-          <el-input-number
-            v-model="form.area"
-            :precision="2"
-            :step="1"
-            :min="0"
-          />
-        </el-form-item>
-        <el-form-item label="价格" prop="price">
-          <el-input-number
-            v-model="form.price"
-            :precision="2"
-            :step="100"
-            :min="0"
-          />
-        </el-form-item>
-        <el-form-item label="描述" prop="description">
-          <el-input
-            v-model="form.description"
-            type="textarea"
-            :rows="3"
-          />
+        <el-form-item label="设施" prop="facilities">
+          <el-select
+            v-model="propertyForm.facilities"
+            multiple
+            placeholder="选择设施"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="facility in availableFacilities"
+              :key="facility.id"
+              :label="facility.name"
+              :value="facility.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">
+          <el-button type="primary" @click="submitForm">
             确定
           </el-button>
         </span>
       </template>
     </el-dialog>
 
-    <!-- 管理设施对话框 -->
+    <!-- Facility Details Dialog -->
     <el-dialog
-      v-model="facilityDialogVisible"
-      title="管理设施"
-      width="500px"
+      v-model="facilityDetailsVisible"
+      title="设施详情"
+      width="400px"
     >
-      <el-form label-width="80px">
-        <el-form-item label="设施">
-          <el-checkbox-group v-model="selectedFacilities">
-            <el-checkbox
-              v-for="facility in facilities"
-              :key="facility.id"
-              :label="facility.id"
-            >
-              {{ facility.name }}
-            </el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="facilityDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleFacilitySubmit">
-            确定
-          </el-button>
-        </span>
-      </template>
+      <div v-if="currentFacility">
+        <h3>{{ currentFacility.name }}</h3>
+        <p class="facility-description">{{ currentFacility.description || '暂无描述' }}</p>
+      </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoomStore } from '@/stores/roomStore'
-import { useLocationStore } from '@/stores/locationStore'
-import { useFacilityStore } from '@/stores/facilityStore'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, watch } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { useRouter } from 'vue-router';
+import { View } from '@element-plus/icons-vue';
+import { usePropertyStore } from '../stores/property';
 
-// Store
-const roomStore = useRoomStore()
-const locationStore = useLocationStore()
-const facilityStore = useFacilityStore()
+const router = useRouter();
+const store = usePropertyStore();
 
-// 状态
-const loading = ref(false)
-const searchQuery = ref('')
-const selectedLocation = ref('')
-const selectedStatus = ref('')
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const dialogVisible = ref(false)
-const dialogType = ref('add')
-const formRef = ref(null)
-const facilityDialogVisible = ref(false)
-const selectedFacilities = ref([])
-const currentRoom = ref(null)
+// 状态变量
+const loading = ref(false);
+const dialogVisible = ref(false);
+const isEditing = ref(false);
+const formRef = ref(null);
+const locationFilter = ref('');
+const roomNumberFilter = ref('');
+const facilityDetailsVisible = ref(false);
+const currentFacility = ref(null);
 
-// 表单数据
-const form = ref({
-  room_number: '',
+// 数据
+const properties = ref([]);
+const locations = ref([]);
+const availableFacilities = ref([]);
+
+// 表单
+const propertyForm = ref({
   location_id: '',
-  status: 'available',
+  room_number: '',
   floor: 1,
-  area: 0,
-  price: 0,
-  description: ''
-})
+  facilities: []
+});
 
 // 表单验证规则
 const rules = {
-  room_number: [{ required: true, message: '请输入房间号', trigger: 'blur' }],
   location_id: [{ required: true, message: '请选择位置', trigger: 'change' }],
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
-  floor: [{ required: true, message: '请输入楼层', trigger: 'blur' }],
-  area: [{ required: true, message: '请输入面积', trigger: 'blur' }],
-  price: [{ required: true, message: '请输入价格', trigger: 'blur' }]
-}
+  room_number: [{ required: true, message: '请输入房间号', trigger: 'blur' }],
+  floor: [{ required: true, message: '请输入楼层', trigger: 'blur' }]
+};
 
 // 计算属性
-const locations = computed(() => locationStore.locations)
-const facilities = computed(() => facilityStore.facilities)
-
-const filteredRooms = computed(() => {
-  let rooms = roomStore.rooms
-
-  if (searchQuery.value) {
-    rooms = rooms.filter(room => 
-      room.room_number.toLowerCase().includes(searchQuery.value.toLowerCase())
-    )
+const filteredProperties = computed(() => {
+  let filtered = properties.value;
+  
+  if (locationFilter.value) {
+    filtered = filtered.filter(property => 
+      property.location?.id === locationFilter.value
+    );
   }
-
-  if (selectedLocation.value) {
-    rooms = rooms.filter(room => room.location_id === selectedLocation.value)
+  
+  if (roomNumberFilter.value) {
+    filtered = filtered.filter(property => 
+      property.room_number.includes(roomNumberFilter.value)
+    );
   }
+  
+  return filtered;
+});
 
-  if (selectedStatus.value) {
-    rooms = rooms.filter(room => room.status === selectedStatus.value)
+// 数据获取方法
+const fetchData = async () => {
+  loading.value = true;
+  try {
+    const [propertiesData, locationsData, facilitiesData] = await Promise.all([
+      store.fetchProperties(),
+      store.fetchLocations(),
+      store.fetchFacilities()
+    ]);
+    
+    // 处理返回的数据，确保位置和设施信息正确
+    properties.value = propertiesData.map(property => ({
+      ...property,
+      location_id: property.location?.id,
+      location_name: property.location?.name,
+      location_address: property.location?.address,
+      facilities: property.facilities || []
+    }));
+    
+    locations.value = locationsData;
+    availableFacilities.value = facilitiesData;
+    
+    console.log('处理后的房屋数据:', properties.value);
+    console.log('获取到的位置数据:', locationsData);
+    console.log('获取到的设施数据:', facilitiesData);
+  } catch (error) {
+    console.error('获取数据失败:', error);
+    ElMessage.error('获取数据失败');
+  } finally {
+    loading.value = false;
   }
-
-  return rooms
-})
+};
 
 // 方法
-const getStatusLabel = (status) => {
-  const statuses = {
-    available: '空闲',
-    occupied: '已租',
-    maintenance: '维护中'
-  }
-  return statuses[status] || status
-}
-
-const getStatusTag = (status) => {
-  const statuses = {
-    available: 'success',
-    occupied: 'warning',
-    maintenance: 'info'
-  }
-  return statuses[status] || ''
-}
-
-const handleSearch = () => {
-  currentPage.value = 1
-  fetchRooms()
-}
-
-const handleLocationChange = () => {
-  currentPage.value = 1
-  fetchRooms()
-}
-
-const handleStatusChange = () => {
-  currentPage.value = 1
-  fetchRooms()
-}
-
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  fetchRooms()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchRooms()
-}
-
-const handleAdd = () => {
-  dialogType.value = 'add'
-  form.value = {
-    room_number: '',
+const showAddDialog = () => {
+  isEditing.value = false;
+  propertyForm.value = {
     location_id: '',
-    status: 'available',
+    room_number: '',
     floor: 1,
-    area: 0,
-    price: 0,
-    description: ''
-  }
-  dialogVisible.value = true
-}
+    facilities: []
+  };
+  dialogVisible.value = true;
+};
 
-const handleEdit = (row) => {
-  dialogType.value = 'edit'
-  form.value = { ...row }
-  dialogVisible.value = true
-}
+const editProperty = (property) => {
+  isEditing.value = true;
+  propertyForm.value = {
+    ...property,
+    location_id: property.location?.id || '',
+    facilities: property.facilities ? property.facilities.map(f => f.id) : []
+  };
+  console.log('编辑时的表单数据:', propertyForm.value);
+  dialogVisible.value = true;
+};
 
-const handleDelete = async (row) => {
+const submitForm = async () => {
+  if (!formRef.value) return;
+  
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      try {
+        // 确保数据格式正确
+        const formData = {
+          ...propertyForm.value,
+          location_id: Number(propertyForm.value.location_id),
+          facilities: Array.isArray(propertyForm.value.facilities) 
+            ? propertyForm.value.facilities.map(id => Number(id))
+            : []
+        };
+        
+        console.log('提交的表单数据:', formData);
+        
+        if (isEditing.value) {
+          const response = await store.updateProperty(formData);
+          console.log('更新后的响应数据:', response);
+          ElMessage.success('更新成功');
+        } else {
+          const response = await store.addProperty(formData);
+          console.log('新增后的响应数据:', response);
+          ElMessage.success('添加成功');
+        }
+        dialogVisible.value = false;
+        await fetchData();
+      } catch (error) {
+        console.error('操作失败:', error);
+        ElMessage.error(error.message || '操作失败');
+      }
+    }
+  });
+};
+
+const deleteProperty = async (id) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个房间吗？', '提示', {
+    await ElMessageBox.confirm('确定要删除该房屋吗？', '提示', {
       type: 'warning'
-    })
-    await roomStore.deleteRoom(row.id)
-    ElMessage.success('删除成功')
-    fetchRooms()
+    });
+    await store.deleteProperty(id);
+    ElMessage.success('删除成功');
+    fetchData();
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      ElMessage.error(error.message || '删除失败');
     }
   }
-}
+};
 
-const handleSubmit = async () => {
-  if (!formRef.value) return
-  
-  try {
-    await formRef.value.validate()
-    
-    if (dialogType.value === 'add') {
-      await roomStore.createRoom(form.value)
-      ElMessage.success('创建成功')
-    } else {
-      await roomStore.updateRoom(form.value.id, form.value)
-      ElMessage.success('更新成功')
-    }
-    
-    dialogVisible.value = false
-    fetchRooms()
-  } catch (error) {
-    ElMessage.error('操作失败')
-  }
-}
+const viewTenants = (propertyId) => {
+  router.push({
+    name: 'TenantView',
+    query: { propertyId }
+  });
+};
 
-const handleManageFacilities = (row) => {
-  currentRoom.value = row
-  selectedFacilities.value = row.facilities.map(f => f.id)
-  facilityDialogVisible.value = true
-}
+const showFacilityDetails = (facility) => {
+  currentFacility.value = facility;
+  facilityDetailsVisible.value = true;
+};
 
-const handleFacilitySubmit = async () => {
-  try {
-    await roomStore.updateRoomFacilities(currentRoom.value.id, selectedFacilities.value)
-    ElMessage.success('更新设施成功')
-    facilityDialogVisible.value = false
-    fetchRooms()
-  } catch (error) {
-    ElMessage.error('操作失败')
-  }
-}
+// 生命周期钩子
+onMounted(() => {
+  fetchData();
+});
 
-const fetchRooms = async () => {
-  loading.value = true
-  try {
-    await roomStore.fetchRooms()
-    total.value = roomStore.rooms.length
-  } catch (error) {
-    ElMessage.error('获取房间列表失败')
-  } finally {
-    loading.value = false
-  }
-}
+// 监听筛选条件变化
+watch([locationFilter, roomNumberFilter], () => {
+  fetchData();
+});
 
-// 初始化
-onMounted(async () => {
-  await Promise.all([
-    locationStore.fetchLocations(),
-    facilityStore.fetchFacilities(),
-    fetchRooms()
-  ])
-})
+// 监听表单数据变化
+watch(propertyForm, (newVal) => {
+  console.log('表单数据变化:', newVal);
+}, { deep: true });
 </script>
 
 <style scoped>
@@ -425,24 +367,33 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.operation-bar {
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
 
-.pagination-container {
-  margin-top: 20px;
+.filter-container {
   display: flex;
-  justify-content: flex-end;
+  gap: 16px;
 }
 
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+.location-address {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 
-.facility-tag {
-  margin-right: 5px;
-  margin-bottom: 5px;
+.facility-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.facility-description {
+  margin-top: 16px;
+  color: #606266;
+  line-height: 1.5;
 }
 </style> 

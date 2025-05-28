@@ -1,207 +1,245 @@
 <template>
   <div class="database-container">
-    <!-- 左侧表列表 -->
-    <el-row :gutter="20">
-      <el-col :span="6">
-        <el-card class="table-list-card">
-          <template #header>
-            <div class="card-header">
-              <span>数据库表</span>
-              <el-input
-                v-model="tableSearchQuery"
-                placeholder="搜索表"
-                clearable
-                size="small"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-            </div>
+    <div class="header-actions">
+      <el-select
+        v-model="selectedTable"
+        placeholder="选择数据表"
+        style="width: 200px;"
+        @change="handleTableChange"
+      >
+        <el-option
+          v-for="table in tables"
+          :key="table"
+          :label="table"
+          :value="table"
+        />
+      </el-select>
+      <el-button
+        v-if="selectedTable"
+        type="danger"
+        @click="handleDeleteAllData"
+        :loading="deleteLoading"
+      >
+        删除所有数据
+      </el-button>
+      <el-button
+        v-if="selectedTable && selectedRows.length > 0"
+        type="danger"
+        @click="handleBatchDelete"
+        :loading="batchDeleteLoading"
+      >
+        批量删除 ({{ selectedRows.length }})
+      </el-button>
+    </div>
+
+    <div v-if="selectedTable" class="table-info">
+      <h3>表结构</h3>
+      <el-table
+        :data="tableSchema"
+        style="width: 100%; margin-bottom: 20px;"
+      >
+        <el-table-column prop="cid" label="序号" width="80" />
+        <el-table-column prop="name" label="字段名" />
+        <el-table-column prop="type" label="类型" />
+        <el-table-column prop="notnull" label="非空">
+          <template #default="{ row }">
+            {{ row.notnull ? '是' : '否' }}
           </template>
-          <el-menu
-            :default-active="selectedTable"
-            class="table-menu"
-            @select="handleTableSelect"
-          >
-            <el-menu-item
-              v-for="table in filteredTables"
-              :key="table.name"
-              :index="table.name"
-            >
-              <el-icon><Document /></el-icon>
-              <span>{{ table.name }}</span>
-            </el-menu-item>
-          </el-menu>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧内容区 -->
-      <el-col :span="18">
-        <el-card v-if="selectedTable" class="content-card">
-          <template #header>
-            <div class="card-header">
-              <span>{{ selectedTable }} 表信息</span>
-              <el-button-group>
-                <el-button type="primary" @click="activeTab = 'structure'">
-                  表结构
-                </el-button>
-                <el-button type="primary" @click="activeTab = 'data'">
-                  数据预览
-                </el-button>
-              </el-button-group>
-            </div>
+        </el-table-column>
+        <el-table-column prop="dflt_value" label="默认值" />
+        <el-table-column prop="pk" label="主键">
+          <template #default="{ row }">
+            {{ row.pk ? '是' : '否' }}
           </template>
+        </el-table-column>
+      </el-table>
 
-          <!-- 表结构 -->
-          <div v-if="activeTab === 'structure'" class="table-structure">
-            <el-table :data="tableStructure" border>
-              <el-table-column prop="name" label="字段名" min-width="120" />
-              <el-table-column prop="type" label="类型" width="120" />
-              <el-table-column prop="nullable" label="允许空" width="100">
-                <template #default="{ row }">
-                  <el-tag :type="row.nullable ? 'info' : 'danger'" size="small">
-                    {{ row.nullable ? '是' : '否' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="default" label="默认值" width="120" />
-              <el-table-column prop="description" label="说明" min-width="200" />
-            </el-table>
-          </div>
-
-          <!-- 数据预览 -->
-          <div v-if="activeTab === 'data'" class="table-data">
-            <el-table
-              v-loading="loading"
-              :data="tableData"
-              border
-              style="width: 100%"
+      <h3>表数据</h3>
+      <el-table
+        v-loading="loading"
+        :data="tableData"
+        style="width: 100%"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column
+          v-for="column in tableSchema"
+          :key="column.name"
+          :prop="column.name"
+          :label="column.name"
+        />
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              type="danger"
+              size="small"
+              @click="handleDeleteRow(row)"
+              :loading="row.deleting"
             >
-              <el-table-column
-                v-for="column in tableColumns"
-                :key="column"
-                :prop="column"
-                :label="column"
-                min-width="120"
-                show-overflow-tooltip
-              />
-            </el-table>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
-            <!-- 分页 -->
-            <div class="pagination-container">
-              <el-pagination
-                v-model:current-page="currentPage"
-                v-model:page-size="pageSize"
-                :page-sizes="[10, 20, 50, 100]"
-                :total="total"
-                layout="total, sizes, prev, pager, next"
-                @size-change="handleSizeChange"
-                @current-change="handleCurrentChange"
-              />
-            </div>
-          </div>
-        </el-card>
-
-        <el-empty v-else description="请选择一个表" />
-      </el-col>
-    </el-row>
+    <div v-else class="no-table-selected">
+      <el-empty description="请选择一个数据表" />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Document, Search } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import { ref, onMounted } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { useDatabaseStore } from '../stores/database';
 
-// API基础URL
-const API_BASE_URL = 'http://localhost:3002/api/database'
+const store = useDatabaseStore();
 
-// 状态
-const loading = ref(false)
-const tableSearchQuery = ref('')
-const selectedTable = ref('')
-const activeTab = ref('structure')
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
-const tables = ref([])
-const tableStructure = ref([])
-const tableData = ref([])
+const loading = ref(false);
+const deleteLoading = ref(false);
+const batchDeleteLoading = ref(false);
+const tables = ref([]);
+const selectedTable = ref('');
+const tableSchema = ref([]);
+const tableData = ref([]);
+const selectedRows = ref([]);
 
-// 计算属性
-const filteredTables = computed(() => {
-  if (!tableSearchQuery.value) return tables.value
-  const query = tableSearchQuery.value.toLowerCase()
-  return tables.value.filter(table => 
-    table.name.toLowerCase().includes(query) ||
-    table.description.toLowerCase().includes(query)
-  )
-})
+onMounted(async () => {
+  await fetchTables();
+});
 
-const tableColumns = computed(() => {
-  if (!tableData.value.length) return []
-  return Object.keys(tableData.value[0])
-})
-
-// 方法
 const fetchTables = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/tables/`)
-    tables.value = response.data
+    tables.value = await store.fetchTables();
   } catch (error) {
-    console.error('Error fetching tables:', error)
-    ElMessage.error(`获取数据表列表失败: ${error.message}`)
+    ElMessage.error('获取数据表列表失败');
   }
-}
+};
 
-const handleTableSelect = async (tableName) => {
-  selectedTable.value = tableName
-  activeTab.value = 'structure'
-  await fetchTableData()
-}
-
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  fetchTableData()
-}
-
-const handleCurrentChange = (val) => {
-  currentPage.value = val
-  fetchTableData()
-}
-
-const fetchTableData = async () => {
-  if (!selectedTable.value) return
+const handleTableChange = async (tableName) => {
+  if (!tableName) return;
   
-  loading.value = true
+  loading.value = true;
   try {
-    const [schemaResponse, dataResponse] = await Promise.all([
-      axios.get(`${API_BASE_URL}/tables/${selectedTable.value}/schema/`),
-      axios.get(`${API_BASE_URL}/tables/${selectedTable.value}/data/`, {
-        params: {
-          page: currentPage.value,
-          page_size: pageSize.value
-        }
-      })
-    ])
+    const [schema, data] = await Promise.all([
+      store.fetchTableSchema(tableName),
+      store.fetchTableData(tableName)
+    ]);
     
-    tableStructure.value = schemaResponse.data
-    tableData.value = dataResponse.data.items
-    total.value = dataResponse.data.total
+    tableSchema.value = schema;
+    tableData.value = data;
   } catch (error) {
-    console.error('Error fetching table data:', error)
-    ElMessage.error(`获取表数据失败: ${error.message || '未知错误'}`)
+    ElMessage.error('获取表数据失败');
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
-// 初始化
-onMounted(() => {
-  fetchTables()
-})
+const handleDeleteAllData = async () => {
+  if (!selectedTable.value) return;
+  
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除该表的所有数据吗？此操作不可恢复！',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    deleteLoading.value = true;
+    await store.deleteAllData(selectedTable.value);
+    ElMessage.success('数据删除成功');
+    await handleTableChange(selectedTable.value);
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除数据失败');
+    }
+  } finally {
+    deleteLoading.value = false;
+  }
+};
+
+const handleDeleteRow = async (row) => {
+  if (!selectedTable.value) return;
+  
+  try {
+    await ElMessageBox.confirm(
+      '确定要删除这条数据吗？此操作不可恢复！',
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    row.deleting = true;
+    
+    const conditions = tableSchema.value
+      .filter(col => col.pk)
+      .reduce((acc, col) => {
+        acc[col.name] = row[col.name];
+        return acc;
+      }, {});
+    
+    await store.deleteRow(selectedTable.value, conditions);
+    ElMessage.success('删除成功');
+    await handleTableChange(selectedTable.value);
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败');
+    }
+  } finally {
+    row.deleting = false;
+  }
+};
+
+const handleBatchDelete = async () => {
+  if (!selectedTable.value || selectedRows.value.length === 0) return;
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedRows.value.length} 条数据吗？此操作不可恢复！`,
+      '警告',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+    
+    batchDeleteLoading.value = true;
+    
+    const primaryKeys = tableSchema.value
+      .filter(col => col.pk)
+      .map(col => col.name);
+    
+    const conditions = selectedRows.value.map(row => 
+      primaryKeys.reduce((acc, key) => {
+        acc[key] = row[key];
+        return acc;
+      }, {})
+    );
+    
+    await store.batchDeleteRows(selectedTable.value, conditions);
+    ElMessage.success('批量删除成功');
+    await handleTableChange(selectedTable.value);
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量删除失败');
+    }
+  } finally {
+    batchDeleteLoading.value = false;
+  }
+};
+
+const handleSelectionChange = (selection) => {
+  selectedRows.value = selection;
+};
 </script>
 
 <style scoped>
@@ -209,44 +247,26 @@ onMounted(() => {
   padding: 20px;
 }
 
-.table-list-card {
-  height: calc(100vh - 140px);
-}
-
-.content-card {
-  height: calc(100vh - 140px);
-}
-
-.card-header {
+.header-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.table-menu {
-  border-right: none;
-}
-
-.table-structure,
-.table-data {
-  height: calc(100vh - 240px);
-  overflow-y: auto;
-}
-
-.pagination-container {
+.table-info {
   margin-top: 20px;
-  display: flex;
-  justify-content: flex-end;
 }
 
-:deep(.el-menu-item) {
+.table-info h3 {
+  margin-bottom: 16px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.no-table-selected {
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 8px;
-}
-
-:deep(.el-card__body) {
-  height: calc(100% - 55px);
-  overflow-y: auto;
+  height: 400px;
 }
 </style> 

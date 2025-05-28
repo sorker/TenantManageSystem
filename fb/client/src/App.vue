@@ -9,6 +9,10 @@
         :default-active="$route.path"
         class="el-menu-vertical"
         :collapse="isCollapse"
+        :collapse-transition="false"
+        background-color="#304156"
+        text-color="#bfcbd9"
+        active-text-color="#409EFF"
       >
         <el-menu-item index="/schedule">
           <el-icon><Calendar /></el-icon>
@@ -41,11 +45,26 @@
       </el-menu>
     </el-aside>
     <el-container class="main-container">
-      <el-header>
-        <h2>租户管理系统</h2>
+      <el-header class="main-header">
+        <div class="header-left">
+          <h2>租户管理系统</h2>
+        </div>
+        <div class="header-right">
+          <el-switch
+            v-model="isDark"
+            class="theme-switch"
+            active-text="暗色"
+            inactive-text="亮色"
+            @change="toggleTheme"
+          />
+        </div>
       </el-header>
       <el-main>
-        <router-view></router-view>
+        <router-view v-slot="{ Component }">
+          <transition name="fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
@@ -56,8 +75,14 @@ import { ref } from 'vue'
 import { User, House, Tools, Calendar, DataLine, Location, TrendCharts, Fold, Expand } from '@element-plus/icons-vue'
 
 const isCollapse = ref(false)
+const isDark = ref(false)
+
 const toggleSidebar = () => {
   isCollapse.value = !isCollapse.value
+}
+
+const toggleTheme = (value) => {
+  document.documentElement.classList.toggle('dark', value)
 }
 </script>
 
@@ -113,5 +138,60 @@ const toggleSidebar = () => {
   transition: all 0.3s;
   flex: 1;
   overflow: auto;
+}
+
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.theme-switch {
+  margin-left: 16px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media screen and (max-width: 768px) {
+  .aside-container {
+    position: fixed;
+    z-index: 1000;
+    height: 100vh;
+  }
+  
+  .main-container {
+    margin-left: 0;
+  }
+  
+  .el-menu-vertical:not(.el-menu--collapse) {
+    width: 200px;
+  }
+}
+
+:root {
+  --el-menu-bg-color: #304156;
+  --el-menu-text-color: #bfcbd9;
+  --el-menu-active-color: #409EFF;
+}
+
+.dark {
+  --el-bg-color: #1a1a1a;
+  --el-text-color-primary: #ffffff;
+  --el-border-color: #333333;
 }
 </style> 
