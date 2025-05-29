@@ -33,27 +33,6 @@
     </div>
 
     <div v-if="selectedTable" class="table-info">
-      <h3>表结构</h3>
-      <el-table
-        :data="tableSchema"
-        style="width: 100%; margin-bottom: 20px;"
-      >
-        <el-table-column prop="cid" label="序号" width="80" />
-        <el-table-column prop="name" label="字段名" />
-        <el-table-column prop="type" label="类型" />
-        <el-table-column prop="notnull" label="非空">
-          <template #default="{ row }">
-            {{ row.notnull ? '是' : '否' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="dflt_value" label="默认值" />
-        <el-table-column prop="pk" label="主键">
-          <template #default="{ row }">
-            {{ row.pk ? '是' : '否' }}
-          </template>
-        </el-table-column>
-      </el-table>
-
       <h3>表数据</h3>
       <el-table
         v-loading="loading"
@@ -63,10 +42,10 @@
       >
         <el-table-column type="selection" width="55" />
         <el-table-column
-          v-for="column in tableSchema"
-          :key="column.name"
-          :prop="column.name"
-          :label="column.name"
+          v-for="(value, key) in (tableData[0] || {})"
+          :key="key"
+          :prop="key"
+          :label="key"
         />
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
@@ -101,7 +80,6 @@ const deleteLoading = ref(false);
 const batchDeleteLoading = ref(false);
 const tables = ref([]);
 const selectedTable = ref('');
-const tableSchema = ref([]);
 const tableData = ref([]);
 const selectedRows = ref([]);
 
@@ -119,16 +97,10 @@ const fetchTables = async () => {
 
 const handleTableChange = async (tableName) => {
   if (!tableName) return;
-  
   loading.value = true;
   try {
-    const [schema, data] = await Promise.all([
-      store.fetchTableSchema(tableName),
-      store.fetchTableData(tableName)
-    ]);
-    
-    tableSchema.value = schema;
-    tableData.value = data;
+    const data = await store.fetchTableData(tableName);
+    tableData.value = data.data;
   } catch (error) {
     ElMessage.error('获取表数据失败');
   } finally {
@@ -179,10 +151,10 @@ const handleDeleteRow = async (row) => {
     
     row.deleting = true;
     
-    const conditions = tableSchema.value
+    const conditions = tableData.value
       .filter(col => col.pk)
       .reduce((acc, col) => {
-        acc[col.name] = row[col.name];
+        acc[col.name] = col[col.name];
         return acc;
       }, {});
     
@@ -214,7 +186,7 @@ const handleBatchDelete = async () => {
     
     batchDeleteLoading.value = true;
     
-    const primaryKeys = tableSchema.value
+    const primaryKeys = tableData.value
       .filter(col => col.pk)
       .map(col => col.name);
     

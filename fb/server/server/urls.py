@@ -22,7 +22,7 @@ from locations.views import LocationViewSet
 from rooms.views import RoomViewSet
 from facilities.views import FacilityViewSet, RoomFacilityViewSet
 from schedules.views import ScheduleViewSet
-from payments.views import PaymentHistoryViewSet
+from payments.views import PaymentHistoryViewSet, StatisticsViewSet
 from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
@@ -32,14 +32,16 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = DefaultRouter()
-router.register(r'tenants', TenantViewSet)
-router.register(r'locations', LocationViewSet)
-router.register(r'rooms', RoomViewSet)
-router.register(r'facilities', FacilityViewSet)
-router.register(r'room-facilities', RoomFacilityViewSet)
-router.register(r'schedules', ScheduleViewSet)
-router.register(r'payments', PaymentHistoryViewSet)
+# 创建路由器并设置trailing_slash=True
+router = DefaultRouter(trailing_slash=True)
+router.register(r'tenants', TenantViewSet, basename='tenant')
+router.register(r'locations', LocationViewSet, basename='location')
+router.register(r'rooms', RoomViewSet, basename='room')
+router.register(r'facilities', FacilityViewSet, basename='facility')
+router.register(r'room-facilities', RoomFacilityViewSet, basename='room-facility')
+router.register(r'schedules', ScheduleViewSet, basename='schedule')
+router.register(r'payments', PaymentHistoryViewSet, basename='payment')
+router.register(r'statistics', StatisticsViewSet, basename='statistics')
 
 @csrf_exempt
 def get_tables(request):

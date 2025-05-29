@@ -4,6 +4,7 @@ from locations.models import Location
 from locations.serializers import LocationSerializer
 from facilities.serializers import FacilitySerializer
 from facilities.models import Facility, RoomFacility
+from tenants.serializers import TenantSerializer
 
 class RoomSerializer(serializers.ModelSerializer):
     location = LocationSerializer(read_only=True)
@@ -19,22 +20,28 @@ class RoomSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+    current_tenant = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
         fields = [
             'id', 'location', 'location_id', 'room_number',
             'floor', 'is_occupied', 'facilities', 'facility_ids',
-            'created_at', 'updated_at'
+            'created_at', 'updated_at', 'current_tenant'
         ]
+
+    def get_current_tenant(self, obj):
+        """获取当前租客信息"""
+        from tenants.models import Tenant
+        current_tenant = Tenant.objects.filter(room=obj, is_active=True).first()
+        if current_tenant:
+            return TenantSerializer(current_tenant).data
+        return None
 
     def get_facilities(self, obj):
         """获取房间的设施列表"""
-        print("获取房间设施，房间ID:", obj.id)  # 添加日志
         facilities = Facility.objects.filter(room_facilities__room_id=obj.id)
-        print("查询到的设施:", facilities)  # 添加日志
         facilities_data = FacilitySerializer(facilities, many=True).data
-        print("序列化后的设施数据:", facilities_data)  # 添加日志
         return facilities_data
 
     def create(self, validated_data):
@@ -99,16 +106,13 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         """自定义数据表示，确保返回完整的设施信息"""
-        print("开始序列化实例:", instance)  # 添加日志
         data = super().to_representation(instance)
         
         # 获取关联的设施
         facilities = Facility.objects.filter(room_facilities__room_id=instance.id)
-        print("获取到的设施:", facilities)  # 添加日志
         
         # 序列化设施数据
         facilities_data = FacilitySerializer(facilities, many=True).data
-        print("序列化后的设施数据:", facilities_data)  # 添加日志
         
         data['facilities'] = facilities_data
         return data 

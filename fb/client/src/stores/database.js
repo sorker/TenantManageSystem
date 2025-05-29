@@ -13,7 +13,7 @@ export const useDatabaseStore = defineStore('database', {
     async fetchTables() {
       try {
         const response = await axios.get('/api/database/tables');
-        this.tables = response.data;
+        this.tables = response.data.tables;
         return this.tables;
       } catch (error) {
         throw new Error('获取数据表列表失败');
@@ -22,9 +22,9 @@ export const useDatabaseStore = defineStore('database', {
 
     async fetchTableSchema(tableName) {
       try {
-        const response = await axios.get(`/api/database/schema/${tableName}`);
-        this.tableSchema = response.data;
-        return this.tableSchema;
+        const response = await axios.get(`/api/database/tables/${tableName}/schema/`);
+        this.tableSchema = response.data.schema;
+        return response.data;
       } catch (error) {
         throw new Error('获取表结构失败');
       }
@@ -32,9 +32,9 @@ export const useDatabaseStore = defineStore('database', {
 
     async fetchTableData(tableName) {
       try {
-        const response = await axios.get(`/api/database/data/${tableName}`);
-        this.tableData = response.data;
-        return this.tableData;
+        const response = await axios.get(`/api/database/tables/${tableName}/data/`);
+        this.tableData = response.data.data;
+        return response.data;
       } catch (error) {
         throw new Error('获取表数据失败');
       }

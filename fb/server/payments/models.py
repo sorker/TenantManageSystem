@@ -4,8 +4,9 @@ from tenants.models import Tenant
 class PaymentHistory(models.Model):
     PAYMENT_TYPES = [
         ('rent', '租金'),
-        ('deposit', '押金'),
-        ('utility', '水电费'),
+        ('water', '水费'),
+        ('electricity', '电费'),
+        ('maintenance', '维修费'),
         ('other', '其他'),
     ]
     

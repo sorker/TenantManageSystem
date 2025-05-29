@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { useRoomStore } from './room';
 
 export const useTenantStore = defineStore('tenant', {
   state: () => ({
@@ -8,10 +9,10 @@ export const useTenantStore = defineStore('tenant', {
   }),
 
   actions: {
-    async fetchTenants() {
+    async fetchTenants(params = {}) {
       this.loading = true;
       try {
-        const tenants = await window.electronAPI.getTenants();
+        const tenants = await window.electronAPI.getTenants(params);
         this.tenants = tenants;
       } catch (error) {
         this.error = error.message;
@@ -99,6 +100,19 @@ export const useTenantStore = defineStore('tenant', {
 
   getters: {
     activeTenants: (state) => state.tenants.filter(t => t.is_active),
-    inactiveTenants: (state) => state.tenants.filter(t => !t.is_active)
+    inactiveTenants: (state) => state.tenants.filter(t => !t.is_active),
+    uniqueLocations: (state) => {
+      const roomStore = useRoomStore();
+      const locations = new Set();
+      
+      // 从房间数据中获取所有地址
+      roomStore.rooms.forEach(room => {
+        if (room.location_name) {
+          locations.add(room.location_name);
+        }
+      });
+      
+      return Array.from(locations).sort();
+    }
   }
 }); 

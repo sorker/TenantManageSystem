@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia';
-import { tenantApi } from '../api';
+import { tenantApi } from '@/api';
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8000/api';
 
 export const useTenantStore = defineStore('tenant', {
   state: () => ({
@@ -15,81 +18,87 @@ export const useTenantStore = defineStore('tenant', {
     },
     activeTenants: (state) => {
       return state.tenants.filter(tenant => tenant.is_active);
+    },
+    uniqueLocations: (state) => {
+      const locations = new Set();
+      state.tenants.forEach(tenant => {
+        if (tenant.room?.location?.name) {
+          locations.add(tenant.room.location.name);
+        }
+      });
+      return Array.from(locations);
     }
   },
 
   actions: {
-    async fetchTenants() {
+    async fetchTenants(params = {}) {
       this.loading = true;
       this.error = null;
       try {
-        const response = await tenantApi.getList();
+        // 构建查询参数
+        const queryParams = {};
+        
+        // 只有当参数存在且不为空时才添加到查询参数中
+        if (params.is_active !== undefined && params.is_active !== null) {
+          queryParams.is_active = params.is_active;
+        }
+        if (params.location && params.location.trim()) {
+          queryParams.location = params.location;
+        }
+        if (params.room_number && params.room_number.trim()) {
+          queryParams.room_number = params.room_number;
+        }
+        if (params.room && params.room !== '') {
+          queryParams.room = params.room;
+        }
+        
+        console.log('Fetching tenants with params:', queryParams);
+        const response = await tenantApi.getList(queryParams);
+        console.log('Tenants API response:', response);
         this.tenants = response;
-        return this.tenants;
+        return response;
       } catch (error) {
+        console.error('Error fetching tenants:', error);
         this.error = error.message;
-        throw new Error('获取租客列表失败');
+        throw error;
       } finally {
         this.loading = false;
       }
     },
 
-    async addTenant(tenantData) {
+    async addTenant(tenant) {
       try {
-        const response = await tenantApi.create(tenantData);
-        this.tenants.push(response);
+        const response = await tenantApi.create(tenant);
+        await this.fetchTenants();
         return response;
       } catch (error) {
-        throw new Error('添加租客失败');
+        this.error = error.message;
+        throw error;
       }
     },
 
-    async updateTenant(tenantData) {
+    async updateTenant(tenant) {
       try {
-        const response = await tenantApi.update(tenantData.id, tenantData);
-        const index = this.tenants.findIndex(t => t.id === tenantData.id);
-        if (index !== -1) {
-          this.tenants[index] = response;
-        }
+        const response = await tenantApi.update(tenant.id, tenant);
+        await this.fetchTenants();
         return response;
       } catch (error) {
-        throw new Error('更新租客失败');
+        this.error = error.message;
+        throw error;
       }
     },
 
     async deleteTenant(id) {
       try {
-        await tenantApi.delete(id);
-        this.tenants = this.tenants.filter(tenant => tenant.id !== id);
-        return true;
-      } catch (error) {
-        throw new Error('删除租客失败');
-      }
-    },
-
-    async terminateContract(tenantId) {
-      try {
-        const response = await tenantApi.terminateContract(tenantId);
-        const index = this.tenants.findIndex(t => t.id === tenantId);
-        if (index !== -1) {
-          this.tenants[index] = response;
-        }
+        console.log('Deleting tenant with ID:', id);
+        const response = await tenantApi.delete(id);
+        console.log('Delete response:', response);
+        await this.fetchTenants();
         return response;
       } catch (error) {
-        throw new Error('终止合同失败');
-      }
-    },
-
-    async renewContract(tenantId) {
-      try {
-        const response = await tenantApi.renewContract(tenantId);
-        const index = this.tenants.findIndex(t => t.id === tenantId);
-        if (index !== -1) {
-          this.tenants[index] = response;
-        }
-        return response;
-      } catch (error) {
-        throw new Error('续签合同失败');
+        console.error('Error deleting tenant:', error);
+        this.error = error.message;
+        throw error;
       }
     },
 
@@ -98,34 +107,67 @@ export const useTenantStore = defineStore('tenant', {
         const response = await tenantApi.getPaymentHistory(tenantId);
         return response;
       } catch (error) {
-        throw new Error('获取支付历史失败');
+        this.error = error.message;
+        throw error;
       }
     },
 
-    async addPayment(paymentData) {
+    async addPayment(payment) {
       try {
-        const response = await tenantApi.addPayment(paymentData);
+        const response = await tenantApi.addPayment(payment);
         return response;
       } catch (error) {
-        throw new Error('添加支付记录失败');
+        this.error = error.message;
+        throw error;
       }
     },
 
     async deletePaymentRecord(paymentId) {
       try {
-        await tenantApi.deletePaymentRecord(paymentId);
-        return true;
+        await tenantApi.deletePayment(paymentId);
       } catch (error) {
-        throw new Error('删除支付记录失败');
+        this.error = error.message;
+        throw error;
       }
     },
 
-    async getContractImages(tenantId) {
+    async fetchRooms() {
       try {
-        const response = await tenantApi.getContractImages(tenantId);
+        const response = await tenantApi.getRooms();
         return response;
       } catch (error) {
-        throw new Error('获取合同文件失败');
+        this.error = error.message;
+        throw error;
+      }
+    },
+
+    async getTenantContractImages(tenantId) {
+      try {
+        const response = await tenantApi.getContractImages(tenantId);
+        return response.data;
+      } catch (error) {
+        this.error = error.message;
+        throw error;
+      }
+    },
+
+    async terminateContract(tenantId) {
+      try {
+        await tenantApi.terminateContract(tenantId);
+        await this.fetchTenants();
+      } catch (error) {
+        this.error = error.message;
+        throw error;
+      }
+    },
+
+    async renewContract(tenantId) {
+      try {
+        await tenantApi.renewContract(tenantId);
+        await this.fetchTenants();
+      } catch (error) {
+        this.error = error.message;
+        throw error;
       }
     }
   }

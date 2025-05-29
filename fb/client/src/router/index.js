@@ -1,5 +1,7 @@
-import { createRouter, createWebHashHistory } from 'vue-router';
+import { createRouter, createWebHistory } from 'vue-router';
 import Statistics from '../views/Statistics.vue'
+import TenantView from '../views/TenantView.vue';
+import PrintPaymentHistory from '../views/PrintPaymentHistory.vue';
 
 const routes = [
   {
@@ -9,7 +11,7 @@ const routes = [
   {
     path: '/tenants',
     name: 'tenants',
-    component: () => import('../views/TenantView.vue')
+    component: TenantView
   },
   {
     path: '/properties',
@@ -27,9 +29,9 @@ const routes = [
     component: () => import('../views/FacilityView.vue')
   },
   {
-    path: '/schedule',
-    name: 'schedule',
-    component: () => import('../views/ScheduleView.vue')
+    path: '/mobile',
+    name: 'mobile',
+    component: () => import('../views/TenantMobileView.vue')
   },
   {
     path: '/database',
@@ -40,11 +42,16 @@ const routes = [
     path: '/statistics',
     name: 'Statistics',
     component: Statistics
+  },
+  {
+    path: '/print-payment-history/:id',
+    name: 'PrintPaymentHistory',
+    component: PrintPaymentHistory
   }
 ];
 
 const router = createRouter({
-  history: createWebHashHistory(),
+  history: createWebHistory(),
   routes
 });
 

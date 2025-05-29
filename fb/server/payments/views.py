@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters import rest_framework as filters
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Avg, F, Q
 from django.utils import timezone
 from datetime import timedelta
 from .models import PaymentHistory
@@ -105,3 +105,73 @@ class PaymentHistoryViewSet(viewsets.ModelViewSet):
         ).values('tenant__name', 'due_date', 'amount')
 
         return Response(upcoming)
+
+class StatisticsViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=['get'])
+    def overview(self, request):
+        # 获取查询参数
+        date_type = request.query_params.get('dateType', 'month')
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        payment_type = request.query_params.get('paymentType')
+        location_id = request.query_params.get('locationId')
+
+        # 构建基础查询
+        query = PaymentHistory.objects.all()
+
+        # 应用过滤条件
+        if payment_type:
+            query = query.filter(payment_type=payment_type)
+        if location_id:
+            query = query.filter(tenant__room__location_id=location_id)
+
+        # 根据日期类型过滤
+        if date_type == 'year' and year:
+            query = query.filter(payment_date__year=year)
+        elif date_type == 'month' and month:
+            year, month = month.split('-')
+            query = query.filter(payment_date__year=year, payment_date__month=month)
+
+        # 计算统计数据
+        total_amount = query.aggregate(total=Sum('amount'))['total'] or 0
+        payment_count = query.count()
+        
+        # 计算准时率
+        on_time_count = query.filter(
+            payment_date__lte=F('due_date')
+        ).count()
+        on_time_rate = (on_time_count / payment_count * 100) if payment_count > 0 else 0
+
+        # 按支付类型分组统计
+        type_stats = query.values('payment_type').annotate(
+            payment_count=Count('id'),
+            total_amount=Sum('amount'),
+            average_amount=Avg('amount'),
+            on_time_count=Count('id', filter=Q(payment_date__lte=F('due_date'))),
+            total_count=Count('id')
+        )
+
+        # 计算趋势数据
+        if date_type == 'year':
+            trend_data = query.values('payment_date__month').annotate(
+                total_amount=Sum('amount'),
+                payment_count=Count('id')
+            ).order_by('payment_date__month')
+        else:
+            trend_data = query.values('payment_date__day').annotate(
+                total_amount=Sum('amount'),
+                payment_count=Count('id')
+            ).order_by('payment_date__day')
+
+        return Response({
+            'totalAmount': total_amount,
+            'currentPeriodTotal': total_amount,
+            'currentPeriodCount': payment_count,
+            'onTimeRate': on_time_rate,
+            'statisticsData': type_stats,
+            'chartData': {
+                'dates': [item['payment_date__month' if date_type == 'year' else 'payment_date__day'] for item in trend_data],
+                'amounts': [float(item['total_amount'] or 0) for item in trend_data],
+                'counts': [item['payment_count'] for item in trend_data]
+            }
+        })

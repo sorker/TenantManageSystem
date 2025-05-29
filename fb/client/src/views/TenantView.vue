@@ -22,8 +22,17 @@
           v-model="roomNumberFilter"
           placeholder="输入房间号"
           clearable
-          style="width: 200px;"
+          style="width: 200px; margin-right: 16px;"
         />
+        <el-select
+          v-model="statusFilter"
+          placeholder="租客状态"
+          clearable
+          style="width: 120px;"
+        >
+          <el-option label="在租" :value="true" />
+          <el-option label="已退租" :value="false" />
+        </el-select>
       </div>
     </div>
 
@@ -89,9 +98,9 @@
           </el-button-group>
         </template>
       </el-table-column>
-      <el-table-column prop="room_id" label="房间号">
+      <el-table-column prop="room" label="房间号">
         <template #default="{ row }">
-          {{ getRoomInfo(row.room_id) }}
+          {{ getRoomInfo(row.room) }}
         </template>
       </el-table-column>
       <el-table-column prop="is_active" label="状态">
@@ -135,8 +144,8 @@
             <el-button 
               size="small" 
               type="danger" 
-              v-if="isLatestPaymentRecord(row)"
-              @click="deletePaymentRecord(row.id)"
+              v-if="!row.last_payment_date"
+              @click="deleteTenant(row)"
               :disabled="!!row.last_payment_date"
               :title="row.last_payment_date ? '已有交租记录，不能删除' : ''"
             >
@@ -179,7 +188,13 @@
           />
         </el-form-item>
         <el-form-item label="租金" prop="rent_amount">
-          <el-input-number v-model="tenantForm.rent_amount" :min="0" />
+          <el-input-number 
+            v-model="tenantForm.rent_amount" 
+            :min="0" 
+            :precision="2"
+            :step="100"
+            @change="handleRentAmountChange"
+          />
         </el-form-item>
         <el-form-item label="交租方式" prop="payment_frequency">
           <el-select v-model="tenantForm.payment_frequency">
@@ -189,15 +204,51 @@
             <el-option label="按年" value="yearly" />
           </el-select>
         </el-form-item>
-        <el-form-item label="房间号" prop="room_id">
-          <el-select v-model="tenantForm.room_id" placeholder="请选择房间">
-            <el-option
-              v-for="room in availableRooms"
-              :key="room.id"
-              :label="`${room.location_name} - ${room.room_number}`"
-              :value="room.id"
-            />
-          </el-select>
+        <el-form-item label="房间信息" prop="room_id">
+          <div class="cascade-select">
+            <el-select 
+              v-model="tenantForm.location_id" 
+              placeholder="请选择位置" 
+              @change="handleLocationChange"
+              style="width: 150px; margin-right: 8px;"
+            >
+              <el-option
+                v-for="location in locations"
+                :key="location.id"
+                :label="location.name"
+                :value="location.id"
+              />
+            </el-select>
+            
+            <el-select 
+              v-model="tenantForm.floor" 
+              placeholder="请选择楼层" 
+              :disabled="!tenantForm.location_id"
+              @change="handleFloorChange"
+              style="width: 100px; margin-right: 8px;"
+            >
+              <el-option
+                v-for="floor in availableFloors"
+                :key="floor"
+                :label="`${floor}层`"
+                :value="floor"
+              />
+            </el-select>
+            
+            <el-select 
+              v-model="tenantForm.room_id" 
+              placeholder="请选择房间号" 
+              :disabled="!tenantForm.floor"
+              style="width: 100px;"
+            >
+              <el-option
+                v-for="room in filteredRooms"
+                :key="room.id"
+                :label="room.room_number"
+                :value="room.id"
+              />
+            </el-select>
+          </div>
         </el-form-item>
         <el-form-item label="最后交租日期" prop="last_payment_date">
           <el-date-picker
@@ -410,12 +461,17 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useTenantStore } from '../stores/tenant';
+import { useRoomStore } from '../stores/room';
+import { useLocationStore } from '../stores/location';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
 const router = useRouter();
+const route = useRoute();
 const store = useTenantStore();
+const roomStore = useRoomStore();
+const locationStore = useLocationStore();
 
 // 状态变量
 const loading = ref(false);
@@ -430,6 +486,7 @@ const currentContractImages = ref([]);
 const currentPaymentHistory = ref([]);
 const locationFilter = ref('');
 const roomNumberFilter = ref('');
+const statusFilter = ref(true);
 
 // 表单相关
 const formRef = ref(null);
@@ -439,11 +496,14 @@ const tenantForm = ref({
   phone: '',
   id_number: '',
   wechat_id: '',
-  check_in_date: '',
+  check_in_date: new Date(),
   rent_amount: 0,
   payment_frequency: 'monthly',
+  location_id: '',
+  floor: null,
   room_id: '',
-  last_payment_date: ''
+  last_payment_date: null,
+  is_active: true
 });
 
 const paymentForm = ref({
@@ -458,12 +518,20 @@ const paymentForm = ref({
 // 表单验证规则
 const rules = {
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  phone: [{ required: true, message: '请输入电话', trigger: 'blur' }],
-  id_number: [{ required: true, message: '请输入身份证号', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ],
+  id_number: [
+    { required: true, message: '请输入身份证号', trigger: 'blur' },
+    { pattern: /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/, message: '请输入正确的身份证号', trigger: 'blur' }
+  ],
   check_in_date: [{ required: true, message: '请选择入住时间', trigger: 'change' }],
   rent_amount: [{ required: true, message: '请输入租金', trigger: 'blur' }],
   payment_frequency: [{ required: true, message: '请选择交租方式', trigger: 'change' }],
-  room_id: [{ required: true, message: '请选择房间', trigger: 'change' }]
+  location_id: [{ required: true, message: '请选择位置', trigger: 'change' }],
+  floor: [{ required: true, message: '请选择楼层', trigger: 'change' }],
+  room_id: [{ required: true, message: '请选择房间号', trigger: 'change' }]
 };
 
 const paymentRules = {
@@ -475,53 +543,133 @@ const paymentRules = {
 
 // 计算属性
 const uniqueLocations = computed(() => {
-  return store.uniqueLocations;
+  const locations = new Set();
+  roomStore.rooms.forEach(room => {
+    if (room.location_name) {
+      locations.add(room.location_name);
+    }
+  });
+  const result = Array.from(locations).sort();
+  return result;
 });
 
 const availableRooms = computed(() => {
-  return store.availableRooms;
+  if (!roomStore.rooms) return [];
+  return roomStore.rooms.filter(room => {
+    // 过滤掉已经有租客的房间
+    const hasTenant = store.tenants.some(tenant => 
+      tenant.room === room.id && tenant.is_active
+    );
+    return !hasTenant;
+  });
 });
 
 const filteredTenants = computed(() => {
-  let tenants = store.tenants;
+  let filtered = store.tenants;
   
+  // 地址筛选
   if (locationFilter.value) {
-    tenants = tenants.filter(t => {
-      const room = store.getRoomById(t.room_id);
-      return room?.location_name === locationFilter.value;
+    filtered = filtered.filter(tenant => {
+      const room = roomStore.getRoomById(tenant.room);
+      return room && room.location_name === locationFilter.value;
     });
   }
   
+  // 房间号筛选
   if (roomNumberFilter.value) {
-    tenants = tenants.filter(t => {
-      const room = store.getRoomById(t.room_id);
-      return room?.room_number.includes(roomNumberFilter.value);
+    filtered = filtered.filter(tenant => {
+      const room = roomStore.getRoomById(tenant.room);
+      return room && room.room_number && 
+        room.room_number.toString().includes(roomNumberFilter.value);
     });
   }
   
-  return tenants;
+  // 状态筛选
+  if (statusFilter.value !== null) {
+    filtered = filtered.filter(tenant => tenant.is_active === statusFilter.value);
+  }
+  
+  return filtered;
+});
+
+// 获取可用的楼层
+const availableFloors = computed(() => {
+  if (!tenantForm.value.location_id || !rooms.value) return [];
+  
+  // 获取该位置下的所有未占用房间
+  const locationRooms = rooms.value.filter(room => 
+    room.location.id === tenantForm.value.location_id && 
+    !room.is_occupied && 
+    !store.tenants.some(tenant => tenant.room === room.id && tenant.is_active)
+  );
+  
+  // 提取并排序楼层
+  const floors = new Set(locationRooms.map(room => room.floor).filter(Boolean));
+  return Array.from(floors).sort((a, b) => a - b);
+});
+
+// 根据选择的位置和楼层过滤房间
+const filteredRooms = computed(() => {
+  if (!tenantForm.value.location_id || !tenantForm.value.floor || !rooms.value) return [];
+  
+  return rooms.value.filter(room => 
+    room.location.id === tenantForm.value.location_id && 
+    room.floor === tenantForm.value.floor &&
+    !room.is_occupied &&
+    !store.tenants.some(tenant => tenant.room === room.id && tenant.is_active)
+  );
 });
 
 // 方法
-const showAddDialog = () => {
+const showAddDialog = async () => {
   isEditing.value = false;
-  tenantForm.value = {
-    name: '',
-    phone: '',
-    id_number: '',
-    wechat_id: '',
-    check_in_date: '',
-    rent_amount: 0,
-    payment_frequency: 'monthly',
-    room_id: '',
-    last_payment_date: ''
-  };
-  dialogVisible.value = true;
+  try {
+    loading.value = true;
+    // 确保获取最新的可用房间列表
+    await roomStore.fetchRooms();
+    
+    // 重置表单
+    tenantForm.value = {
+      name: '',
+      phone: '',
+      id_number: '',
+      wechat_id: '',
+      check_in_date: new Date(),
+      rent_amount: 0,
+      payment_frequency: 'monthly',
+      location_id: '',
+      floor: null,
+      room_id: '',
+      last_payment_date: null,
+      is_active: true
+    };
+    
+    // 确保房间数据已加载
+    if (roomStore.rooms.length === 0) {
+      ElMessage.warning('没有可用的房间');
+      return;
+    }
+    
+    dialogVisible.value = true;
+  } catch (error) {
+    ElMessage.error('获取房间列表失败');
+    console.error('获取房间列表失败:', error);
+  } finally {
+    loading.value = false;
+  }
 };
 
 const editTenant = (tenant) => {
   isEditing.value = true;
-  tenantForm.value = { ...tenant };
+  tenantForm.value = {
+    ...tenant,
+    rent_amount: Number(tenant.rent_amount),
+    check_in_date: tenant.check_in_date ? new Date(tenant.check_in_date) : null,
+    last_payment_date: tenant.last_payment_date ? new Date(tenant.last_payment_date) : null,
+    location_id: tenant.room?.location?.id || '',
+    floor: tenant.room?.floor || null,
+    room_id: tenant.room || ''
+  };
   dialogVisible.value = true;
 };
 
@@ -531,11 +679,26 @@ const submitForm = async () => {
   await formRef.value.validate(async (valid) => {
     if (valid) {
       try {
+        // 格式化数据
+        const formData = {
+          ...tenantForm.value,
+          check_in_date: tenantForm.value.check_in_date ? 
+            new Date(tenantForm.value.check_in_date).toISOString().split('T')[0] : null,
+          last_payment_date: tenantForm.value.last_payment_date ? 
+            new Date(tenantForm.value.last_payment_date).toISOString().split('T')[0] : null,
+          room: tenantForm.value.room_id
+        };
+
+        // 删除不需要的字段
+        delete formData.location_id;
+        delete formData.floor;
+        delete formData.room_id;
+
         if (isEditing.value) {
-          await store.updateTenant(tenantForm.value);
+          await store.updateTenant(formData);
           ElMessage.success('更新成功');
         } else {
-          await store.addTenant(tenantForm.value);
+          await store.addTenant(formData);
           ElMessage.success('添加成功');
         }
         dialogVisible.value = false;
@@ -550,10 +713,18 @@ const submitForm = async () => {
 const showContractImages = async (tenant) => {
   currentTenant.value = tenant;
   try {
-    currentContractImages.value = await store.getContractImages(tenant.id);
-    contractImagesVisible.value = true;
+    loading.value = true;
+    currentContractImages.value = await store.getTenantContractImages(tenant.id);
+    if (currentContractImages.value.length === 0) {
+      ElMessage.info('暂无合同文件');
+    } else {
+      contractImagesVisible.value = true;
+    }
   } catch (error) {
     ElMessage.error('获取合同文件失败');
+    console.error('获取合同文件失败:', error);
+  } finally {
+    loading.value = false;
   }
 };
 
@@ -565,20 +736,69 @@ const showPrivacyInfo = (tenant) => {
 const showPaymentHistory = async (tenant) => {
   currentTenant.value = tenant;
   try {
+    loading.value = true;
     currentPaymentHistory.value = await store.getPaymentHistory(tenant.id);
-    paymentHistoryVisible.value = true;
+    if (currentPaymentHistory.value.length === 0) {
+      ElMessage.info('暂无交租记录');
+    } else {
+      paymentHistoryVisible.value = true;
+    }
   } catch (error) {
-    ElMessage.error('获取缴费历史失败');
+    ElMessage.error('获取交租历史失败');
+    console.error('获取交租历史失败:', error);
+  } finally {
+    loading.value = false;
   }
 };
 
 const showAddPaymentDialog = (tenant) => {
   currentTenant.value = tenant;
+  const baseAmount = Number(tenant.rent_amount) || 0;
+  let amount = baseAmount;
+  
+  // 根据交租方式计算金额
+  switch (tenant.payment_frequency) {
+    case 'semi_annual':
+      amount = baseAmount * 6;
+      break;
+    case 'quarterly':
+      amount = baseAmount * 3;
+      break;
+    case 'yearly':
+      amount = baseAmount * 12;
+      break;
+    default: // monthly
+      amount = baseAmount;
+  }
+
+  // 计算约定交租日期
+  let dueDate;
+  if (tenant.last_payment_date) {
+    // 如果有上次交租日期，基于上次交租日期计算
+    dueDate = new Date(tenant.last_payment_date);
+    switch (tenant.payment_frequency) {
+      case 'semi_annual':
+        dueDate.setMonth(dueDate.getMonth() + 6);
+        break;
+      case 'quarterly':
+        dueDate.setMonth(dueDate.getMonth() + 3);
+        break;
+      case 'yearly':
+        dueDate.setFullYear(dueDate.getFullYear() + 1);
+        break;
+      default: // monthly
+        dueDate.setMonth(dueDate.getMonth() + 1);
+    }
+  } else {
+    // 如果是第一次交租，约定日期就是入住当日
+    dueDate = new Date(tenant.check_in_date);
+  }
+
   paymentForm.value = {
     payment_date: new Date(),
     payment_type: 'rent',
-    due_date: '',
-    amount: tenant.rent_amount,
+    due_date: dueDate,
+    amount: amount,
     payment_method: 'cash',
     notes: ''
   };
@@ -586,20 +806,53 @@ const showAddPaymentDialog = (tenant) => {
 };
 
 const submitPayment = async () => {
-  if (!paymentFormRef.value) return;
+  if (!paymentFormRef.value || !currentTenant.value) {
+    ElMessage.error('租客信息不完整');
+    return;
+  }
   
   await paymentFormRef.value.validate(async (valid) => {
     if (valid) {
       try {
-        await store.addPayment({
+        // 确保tenant_id是数字类型
+        const tenantId = Number(currentTenant.value.id);
+        if (isNaN(tenantId)) {
+          throw new Error('租客ID格式不正确');
+        }
+
+        const paymentData = {
           ...paymentForm.value,
-          tenant_id: currentTenant.value.id
-        });
+          amount: Number(paymentForm.value.amount),
+          tenant_id: tenantId,
+          payment_date: paymentForm.value.payment_date ? 
+            new Date(paymentForm.value.payment_date).toISOString().split('T')[0] : null,
+          due_date: paymentForm.value.due_date ? 
+            new Date(paymentForm.value.due_date).toISOString().split('T')[0] : null
+        };
+
+        console.log('提交的支付数据:', paymentData);
+
+        await store.addPayment(paymentData);
+        
+        // 如果是租金支付，更新租客的最后交租日期
+        if (paymentData.payment_type === 'rent') {
+          await store.updateTenant({
+            ...currentTenant.value,
+            last_payment_date: paymentData.payment_date
+          });
+        }
+        
         ElMessage.success('添加缴费记录成功');
         addPaymentVisible.value = false;
         fetchData();
       } catch (error) {
-        ElMessage.error(error.message || '添加缴费记录失败');
+        console.error('添加缴费记录失败:', error);
+        if (error.response) {
+          console.error('错误响应:', error.response.data);
+          ElMessage.error(error.response.data.message || '添加缴费记录失败');
+        } else {
+          ElMessage.error(error.message || '添加缴费记录失败');
+        }
       }
     }
   });
@@ -640,9 +893,10 @@ const deletePaymentRecord = async (id) => {
     await ElMessageBox.confirm('确定要删除该缴费记录吗？', '提示', {
       type: 'warning'
     });
-    await store.deletePaymentRecord(id);
+    await store.deletePaymentRecord(id, currentTenant.value.id);
     ElMessage.success('删除成功');
-    fetchData();
+    // 重新加载支付历史
+    currentPaymentHistory.value = await store.getPaymentHistory(currentTenant.value.id);
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || '删除失败');
@@ -658,8 +912,11 @@ const goPrintPage = (tenant) => {
 };
 
 const getRoomInfo = (roomId) => {
-  const room = store.getRoomById(roomId);
-  return room ? `${room.location_name} - ${room.room_number}` : '-';
+  if (!roomId) return '-';
+  const room = roomStore.getRoomById(roomId);
+  if (!room) return '-';
+  const locationName = room.location?.name || room.location_name || '未知地址';
+  return `${locationName} - ${room.room_number || '未知房间号'}`;
 };
 
 const getPaymentFrequencyLabel = (frequency) => {
@@ -669,7 +926,7 @@ const getPaymentFrequencyLabel = (frequency) => {
     quarterly: '按季',
     yearly: '按年'
   };
-  return map[frequency] || frequency;
+  return map[frequency] || '未知';
 };
 
 const getPaymentTypeLabel = (type) => {
@@ -694,46 +951,313 @@ const getPaymentMethodLabel = (method) => {
 
 const isLatestPaymentOfType = (payment) => {
   if (!currentPaymentHistory.value.length) return false;
-  const sameTypePayments = currentPaymentHistory.value.filter(p => p.payment_type === payment.payment_type);
+  const sameTypePayments = currentPaymentHistory.value
+    .filter(p => p.payment_type === payment.payment_type)
+    .sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
   return sameTypePayments[0]?.id === payment.id;
+};
+
+const isLatestPaymentRecord = async (tenant) => {
+  try {
+    const paymentHistory = await store.getPaymentHistory(tenant.id);
+    return paymentHistory && paymentHistory.length === 1;
+  } catch (error) {
+    console.error('获取支付历史失败:', error);
+    return false;
+  }
 };
 
 const handlePaymentTypeChange = () => {
   if (paymentForm.value.payment_type === 'rent') {
-    paymentForm.value.amount = currentTenant.value?.rent_amount || 0;
+    const baseAmount = currentTenant.value?.rent_amount || 0;
+    let amount = baseAmount;
+    
+    // 根据交租方式计算金额
+    switch (currentTenant.value?.payment_frequency) {
+      case 'semi_annual':
+        amount = baseAmount * 6;
+        break;
+      case 'quarterly':
+        amount = baseAmount * 3;
+        break;
+      case 'yearly':
+        amount = baseAmount * 12;
+        break;
+      default: // monthly
+        amount = baseAmount;
+    }
+    
+    paymentForm.value.amount = amount;
+    
+    // 更新约定交租日期
+    let dueDate;
+    if (currentTenant.value?.last_payment_date) {
+      // 如果有上次交租日期，基于上次交租日期计算
+      dueDate = new Date(currentTenant.value.last_payment_date);
+      switch (currentTenant.value.payment_frequency) {
+        case 'semi_annual':
+          dueDate.setMonth(dueDate.getMonth() + 6);
+          break;
+        case 'quarterly':
+          dueDate.setMonth(dueDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          dueDate.setFullYear(dueDate.getFullYear() + 1);
+          break;
+        default: // monthly
+          dueDate.setMonth(dueDate.getMonth() + 1);
+      }
+    } else {
+      // 如果是第一次交租，基于入住日期计算
+      dueDate = new Date(currentTenant.value.check_in_date);
+      switch (currentTenant.value.payment_frequency) {
+        case 'semi_annual':
+          dueDate.setMonth(dueDate.getMonth() + 6);
+          break;
+        case 'quarterly':
+          dueDate.setMonth(dueDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          dueDate.setFullYear(dueDate.getFullYear() + 1);
+          break;
+        default: // monthly
+          dueDate.setMonth(dueDate.getMonth() + 1);
+      }
+    }
+    
+    paymentForm.value.due_date = dueDate;
   } else {
     paymentForm.value.amount = 0;
+    paymentForm.value.due_date = null;
   }
 };
 
 const handleImageError = (e) => {
   e.target.src = '/placeholder.png';
+  ElMessage.warning('图片加载失败');
+};
+
+const handleRentAmountChange = (value) => {
+  tenantForm.value.rent_amount = Number(value);
+};
+
+// 计算下一个交租日期
+const calculateNextPaymentDate = (lastDueDate, frequency) => {
+  const nextDate = new Date(lastDueDate);
+  switch (frequency) {
+    case 'monthly':
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      break;
+    case 'quarterly':
+      nextDate.setMonth(nextDate.getMonth() + 3);
+      break;
+    case 'semi_annual':
+      nextDate.setMonth(nextDate.getMonth() + 6);
+      break;
+    case 'yearly':
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
+      break;
+  }
+  return nextDate;
+};
+
+// 检查是否逾期
+const isPaymentOverdue = async (tenant) => {
+  if (!tenant.payment_frequency || !tenant.check_in_date) return false;
+  
+  // 如果是第一次交租，检查是否已经超过入住日期
+  if (!tenant.last_payment_date) {
+    const checkInDate = new Date(tenant.check_in_date);
+    const today = new Date();
+    const diffTime = today.getTime() - checkInDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0;
+  }
+  
+  try {
+    // 加载租客的交租历史
+    const paymentHistory = await store.getPaymentHistory(tenant.id);
+    
+    // 先找到所有实际交租日期匹配的记录，然后按约定日期排序取最后一个
+    const matchingPayments = paymentHistory
+      .filter(p => new Date(p.payment_date).getTime() === new Date(tenant.last_payment_date).getTime())
+      .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+    
+    const lastPayment = matchingPayments[matchingPayments.length - 1];
+    
+    if (!lastPayment) return false;
+    
+    // 基于上次约定交租日期计算下一次约定交租日期
+    const nextDueDate = calculateNextPaymentDate(new Date(lastPayment.due_date), tenant.payment_frequency);
+    const today = new Date();
+    
+    // 计算距离约定日期的天数
+    const diffTime = nextDueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // 根据交租周期计算提醒天数
+    let periodDays;
+    switch (tenant.payment_frequency) {
+      case 'monthly':
+        periodDays = 30;
+        break;
+      case 'quarterly':
+        periodDays = 90;
+        break;
+      case 'semi_annual':
+        periodDays = 180;
+        break;
+      case 'yearly':
+        periodDays = 365;
+        break;
+      default:
+        periodDays = 30;
+    }
+    
+    // 如果距离约定日期在7天之内（包括已过期7天内）且未超过周期减7天，则显示红色
+    return diffDays < -7;
+  } catch (error) {
+    console.error('获取交租历史失败:', error);
+    return false;
+  }
 };
 
 // 数据获取
 const fetchData = async () => {
   loading.value = true;
   try {
+    const params = {};
+    
+    // 添加状态筛选
+    if (statusFilter.value !== null) {
+      params.is_active = statusFilter.value;
+    }
+    
+    // 添加地址筛选
+    if (locationFilter.value) {
+      params.location = locationFilter.value;
+    }
+    
+    // 添加房间号筛选
+    if (roomNumberFilter.value) {
+      params.room_number = roomNumberFilter.value;
+    }
+
+    // 只有在有 roomId 参数时才添加 room 筛选
+    if (route.query.roomId) {
+      params.room = route.query.roomId;
+    }
+    
+    console.log('Fetching tenants with params:', params);
     await Promise.all([
-      store.fetchTenants(),
-      store.fetchRooms()
+      store.fetchTenants(params),
+      roomStore.fetchRooms()
     ]);
+        
+    // 计算每个租客的逾期状态
+    for (const tenant of store.tenants) {
+      try {
+        tenant.isOverdue = await isPaymentOverdue(tenant);
+      } catch (error) {
+        console.error('计算逾期状态失败:', error);
+        tenant.isOverdue = false;
+      }
+    }
   } catch (error) {
     ElMessage.error('获取数据失败');
+    console.error('获取数据失败:', error);
   } finally {
     loading.value = false;
   }
 };
 
-// 生命周期钩子
-onMounted(() => {
+// 监听筛选条件变化
+watch([locationFilter, roomNumberFilter, statusFilter], () => {
   fetchData();
 });
 
-// 监听筛选条件变化
-watch([locationFilter, roomNumberFilter], () => {
-  fetchData();
+// 监听路由参数变化
+watch(() => route.query.roomId, (newRoomId) => {
+  if (newRoomId) {
+    fetchData();
+  }
+}, { immediate: true });
+
+// 生命周期钩子
+onMounted(async () => {
+  try {
+    loading.value = true;
+    await Promise.all([
+      fetchLocations(),
+      fetchRooms()
+    ]);
+  } catch (error) {
+    console.error('初始化数据失败:', error);
+    ElMessage.error('初始化数据失败');
+  } finally {
+    loading.value = false;
+  }
 });
+
+// 添加获取房间标签的方法
+const getRoomLabel = (room) => {
+  if (!room) return '未知房间';
+  const locationName = room.location?.name || room.location_name || '未知地址';
+  const roomNumber = room.room_number || '未知房间号';
+  return `${locationName} - ${roomNumber}`;
+};
+
+const deleteTenant = async (tenant) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该租客吗？', '提示', {
+      type: 'warning'
+    });
+    await store.deleteTenant(tenant.id);
+    ElMessage.success('删除成功');
+    fetchData();
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败');
+    }
+  }
+};
+
+const locations = ref([]);
+const rooms = ref([]);
+
+// 处理位置变化
+const handleLocationChange = () => {
+  tenantForm.value.floor = null;
+  tenantForm.value.room_id = '';
+};
+
+// 处理楼层变化
+const handleFloorChange = () => {
+  tenantForm.value.room_id = '';
+};
+
+// 获取位置列表
+const fetchLocations = async () => {
+  try {
+    await locationStore.fetchLocations();
+    locations.value = locationStore.locations;
+  } catch (error) {
+    ElMessage.error('获取位置列表失败');
+    console.error('获取位置列表失败:', error);
+  }
+};
+
+// 获取房间列表
+const fetchRooms = async () => {
+  try {
+    await roomStore.fetchRooms();
+    rooms.value = roomStore.rooms;
+    console.log('获取到的房间数据:', rooms.value);
+  } catch (error) {
+    ElMessage.error('获取房间列表失败');
+    console.error('获取房间列表失败:', error);
+  }
+};
 </script>
 
 <style scoped>
@@ -819,5 +1343,28 @@ watch([locationFilter, roomNumberFilter], () => {
     color: #909399;
     font-size: 12px;
   }
+}
+
+.cascade-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
+.cascade-select .el-select {
+  flex-shrink: 0;
+}
+
+/* 调整表单项的布局 */
+:deep(.el-form-item__content) {
+  flex-wrap: nowrap;
+  margin-left: 0 !important;
+}
+
+:deep(.el-form-item__label) {
+  width: 100px !important;
+  text-align: right;
+  padding-right: 12px;
 }
 </style> 

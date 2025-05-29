@@ -4,13 +4,15 @@ import { api } from '../api';
 export const useStatisticsStore = defineStore('statistics', {
   state: () => ({
     loading: false,
-    statistics: {
-      totalAmount: 0,
-      currentPeriodAmount: 0,
-      paymentCount: 0,
-      onTimeRate: 0,
-      trends: [],
-      details: []
+    totalAmount: 0,
+    currentPeriodTotal: 0,
+    currentPeriodCount: 0,
+    onTimeRate: 0,
+    statisticsData: [],
+    chartData: {
+      dates: [],
+      amounts: [],
+      counts: []
     },
     filters: {
       dateRange: 'year',
@@ -23,28 +25,33 @@ export const useStatisticsStore = defineStore('statistics', {
 
   getters: {
     formattedTotalAmount: (state) => {
-      return state.statistics.totalAmount.toLocaleString('zh-CN', {
+      return state.totalAmount.toLocaleString('zh-CN', {
         style: 'currency',
         currency: 'CNY'
       });
     },
     formattedCurrentPeriodAmount: (state) => {
-      return state.statistics.currentPeriodAmount.toLocaleString('zh-CN', {
+      return state.currentPeriodTotal.toLocaleString('zh-CN', {
         style: 'currency',
         currency: 'CNY'
       });
     },
     formattedOnTimeRate: (state) => {
-      return `${(state.statistics.onTimeRate * 100).toFixed(1)}%`;
+      return `${(state.onTimeRate * 100).toFixed(1)}%`;
     }
   },
 
   actions: {
-    async fetchStatistics() {
+    async fetchStatistics(params) {
       this.loading = true;
       try {
-        const response = await api.get('/statistics', { params: this.filters });
-        this.statistics = response;
+        const response = await api.get('statistics/overview/', { params });
+        this.totalAmount = response.totalAmount;
+        this.currentPeriodTotal = response.currentPeriodTotal;
+        this.currentPeriodCount = response.currentPeriodCount;
+        this.onTimeRate = response.onTimeRate;
+        this.statisticsData = response.statisticsData;
+        this.chartData = response.chartData;
       } catch (error) {
         console.error('获取统计数据失败:', error);
         throw error;
@@ -64,8 +71,8 @@ export const useStatisticsStore = defineStore('statistics', {
         };
 
         const response = await api.get('/statistics/trends', { params });
-        this.statistics.trends = response.data;
-        return this.statistics.trends;
+        this.statisticsData = response.data;
+        return this.statisticsData;
       } catch (error) {
         throw new Error('获取支付趋势数据失败');
       }
@@ -82,8 +89,8 @@ export const useStatisticsStore = defineStore('statistics', {
         };
 
         const response = await api.get('/statistics/details', { params });
-        this.statistics.details = response.data;
-        return this.statistics.details;
+        this.statisticsData = response.data;
+        return this.statisticsData;
       } catch (error) {
         throw new Error('获取支付详情数据失败');
       }

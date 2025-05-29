@@ -219,9 +219,9 @@ const locationStore = useLocationStore();
 // 常量
 const PAYMENT_TYPE_LABELS = {
   rent: '租金',
-  deposit: '押金',
-  utility: '水电费',
-  other: '其他'
+  water: '水费',
+  electricity: '电费',
+  maintenance: '维修费'
 };
 
 // 状态变量
@@ -234,7 +234,7 @@ const selectedLocation = ref('');
 const isLoadingTypes = ref(false);
 const isLoadingLocations = ref(false);
 const locations = ref([]);
-const paymentTypes = ref(['rent', 'deposit', 'utility', 'other']);
+const paymentTypes = ref(['rent', 'water', 'electricity', 'maintenance']);
 const monthlyChartContainer = ref(null);
 let monthlyChart = null;
 

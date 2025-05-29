@@ -35,5 +35,5 @@ class RoomViewSet(viewsets.ModelViewSet):
         print("开始获取列表")  # 添加日志
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-        print("序列化后的数据:", serializer.data)  # 添加日志
+        # print("序列化后的数据:", serializer.data)  # 添加日志
         return Response(serializer.data)

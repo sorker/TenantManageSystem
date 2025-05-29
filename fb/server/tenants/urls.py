@@ -2,6 +2,5 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('', views.TenantListCreateView.as_view(), name='tenant-list-create'),
-    path('<int:pk>/', views.TenantRetrieveUpdateDestroyView.as_view(), name='tenant-detail'),
+    # 删除重复的URL配置，因为已经使用了DefaultRouter
 ] 

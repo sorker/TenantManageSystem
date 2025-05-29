@@ -14,9 +14,9 @@
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
-        <el-menu-item index="/schedule">
+        <el-menu-item index="/mobile">
           <el-icon><Calendar /></el-icon>
-          <template #title>日程管理</template>
+          <template #title>租户日程</template>
         </el-menu-item>
         <el-menu-item index="/tenants">
           <el-icon><User /></el-icon>
@@ -44,6 +44,11 @@
         </el-menu-item>
       </el-menu>
     </el-aside>
+    <div 
+      v-show="!isCollapse" 
+      class="menu-mask"
+      @click="toggleSidebar"
+    ></div>
     <el-container class="main-container">
       <el-header class="main-header">
         <div class="header-left">
@@ -67,12 +72,19 @@
         </router-view>
       </el-main>
     </el-container>
+    <div 
+      v-show="isCollapse" 
+      class="floating-menu-button"
+      @click="toggleSidebar"
+    >
+      <el-icon><Menu /></el-icon>
+    </div>
   </el-container>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { User, House, Tools, Calendar, DataLine, Location, TrendCharts, Fold, Expand } from '@element-plus/icons-vue'
+import { User, House, Tools, Calendar, DataLine, Location, TrendCharts, Fold, Expand, Menu } from '@element-plus/icons-vue'
 
 const isCollapse = ref(false)
 const isDark = ref(false)
@@ -181,6 +193,21 @@ const toggleTheme = (value) => {
   .el-menu-vertical:not(.el-menu--collapse) {
     width: 200px;
   }
+  
+  .floating-menu-button {
+    width: 40px;
+    height: 40px;
+    left: 15px;
+    bottom: 15px;
+  }
+
+  .floating-menu-button .el-icon {
+    font-size: 20px;
+  }
+
+  .menu-mask {
+    display: block;
+  }
 }
 
 :root {
@@ -193,5 +220,44 @@ const toggleTheme = (value) => {
   --el-bg-color: #1a1a1a;
   --el-text-color-primary: #ffffff;
   --el-border-color: #333333;
+}
+
+/* 圆形悬浮按钮样式 */
+.floating-menu-button {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #409eff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.floating-menu-button:hover {
+  transform: scale(1.1);
+  background-color: #66b1ff;
+}
+
+.floating-menu-button .el-icon {
+  font-size: 24px;
+}
+
+.menu-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: none;
 }
 </style> 

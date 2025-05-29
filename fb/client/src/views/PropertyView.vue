@@ -58,15 +58,6 @@
               style="margin-right: 4px; margin-bottom: 4px;"
             >
               {{ facility.name }}
-              <el-button
-                v-if="facility.description"
-                type="text"
-                size="small"
-                @click="showFacilityDetails(facility)"
-                style="margin-left: 4px; padding: 0 4px;"
-              >
-                <el-icon><View /></el-icon>
-              </el-button>
             </el-tag>
           </div>
         </template>
@@ -153,18 +144,6 @@
         </span>
       </template>
     </el-dialog>
-
-    <!-- Facility Details Dialog -->
-    <el-dialog
-      v-model="facilityDetailsVisible"
-      title="设施详情"
-      width="400px"
-    >
-      <div v-if="currentFacility">
-        <h3>{{ currentFacility.name }}</h3>
-        <p class="facility-description">{{ currentFacility.description || '暂无描述' }}</p>
-      </div>
-    </el-dialog>
   </div>
 </template>
 
@@ -174,9 +153,11 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { View } from '@element-plus/icons-vue';
 import { usePropertyStore } from '../stores/property';
+import { useTenantStore } from '../stores/tenant';
 
 const router = useRouter();
 const store = usePropertyStore();
+const tenantStore = useTenantStore();
 
 // 状态变量
 const loading = ref(false);
@@ -185,8 +166,6 @@ const isEditing = ref(false);
 const formRef = ref(null);
 const locationFilter = ref('');
 const roomNumberFilter = ref('');
-const facilityDetailsVisible = ref(false);
-const currentFacility = ref(null);
 
 // 数据
 const properties = ref([]);
@@ -243,7 +222,9 @@ const fetchData = async () => {
       location_id: property.location?.id,
       location_name: property.location?.name,
       location_address: property.location?.address,
-      facilities: property.facilities || []
+      facilities: property.facilities || [],
+      current_tenant_id: property.current_tenant?.id || null,
+      current_tenant_name: property.current_tenant?.name || null
     }));
     
     locations.value = locationsData;
@@ -293,7 +274,7 @@ const submitForm = async () => {
         const formData = {
           ...propertyForm.value,
           location_id: Number(propertyForm.value.location_id),
-          facilities: Array.isArray(propertyForm.value.facilities) 
+          facility_ids: Array.isArray(propertyForm.value.facilities) 
             ? propertyForm.value.facilities.map(id => Number(id))
             : []
         };
@@ -336,14 +317,9 @@ const deleteProperty = async (id) => {
 
 const viewTenants = (propertyId) => {
   router.push({
-    name: 'TenantView',
-    query: { propertyId }
+    name: 'tenants',
+    query: { roomId: propertyId }
   });
-};
-
-const showFacilityDetails = (facility) => {
-  currentFacility.value = facility;
-  facilityDetailsVisible.value = true;
 };
 
 // 生命周期钩子
@@ -388,7 +364,15 @@ watch(propertyForm, (newVal) => {
 .facility-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
+}
+
+.facility-tags :deep(.el-tag) {
+  margin: 0;
+  padding: 0 4px;
+  height: 20px;
+  line-height: 18px;
+  font-size: 12px;
 }
 
 .facility-description {
