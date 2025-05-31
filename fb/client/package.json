@@ -14,12 +14,14 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
     "electron:dev": "cross-env NODE_ENV=development vite build --watch & electron .",
-    "electron:build": "cross-env NODE_ENV=production ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true ELECTRON_BUILDER_USE_HARD_LINKS=false ELECTRON_BUILDER_USE_SYMLINKS=false vite build && electron-builder",
+    "electron:build": "cross-env NODE_ENV=production ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true ELECTRON_BUILDER_USE_HARD_LINKS=false ELECTRON_BUILDER_USE_SYMLINKS=false ELECTRON_BUILDER_CACHE=./electron-builder-cache ELECTRON_BUILDER_CACHE_DIR=./electron-builder-cache ELECTRON_BUILDER_APP_UPDATE_ENABLED=false ELECTRON_BUILDER_SIGNING_ENABLED=false vite build && electron-builder",
     "electron:preview": "cross-env NODE_ENV=production electron ."
   },
   "dependencies": {
     "axios": "^1.9.0",
     "echarts": "^5.4.3",
+    "electron-log": "^5.4.0",
+    "electron-updater": "^6.6.2",
     "element-plus": "^2.3.9",
     "pinia": "^2.1.6",
     "vue": "^3.3.4",
@@ -45,7 +47,8 @@
     "appId": "com.tenant.management",
     "productName": "租户管理系统",
     "directories": {
-      "output": "dist_electron"
+      "output": "dist_electron",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -53,17 +56,26 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.ico",
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "租户管理系统"
+      "shortcutName": "租户管理系统",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico"
     },
     "mac": {
       "target": [
@@ -74,6 +86,10 @@
       "target": [
         "AppImage"
       ]
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://your-update-server.com/updates/"
     },
     "asar": true,
     "asarUnpack": [
