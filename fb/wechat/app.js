@@ -1,7 +1,7 @@
 App({
   globalData: {
     userInfo: null,
-    baseUrl: 'http://localhost:8000/api'
+    baseUrl: 'http://localhost:8000/'
   },
   onLaunch() {
     // 初始化云开发
