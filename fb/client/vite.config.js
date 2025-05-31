@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import path from 'path';
+import { resolve } from 'path';
 import viteCompression from 'vite-plugin-compression';
 
 export default defineConfig({
@@ -14,9 +14,10 @@ export default defineConfig({
       ext: '.gz'
     })
   ],
+  base: './',
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': resolve(__dirname, 'src'),
     },
   },
   build: {
@@ -37,7 +38,10 @@ export default defineConfig({
         }
       }
     },
-    chunkSizeWarningLimit: 1500
+    chunkSizeWarningLimit: 1500,
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
   },
   server: {
     port: 3001,
