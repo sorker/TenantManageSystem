@@ -14,3 +14,5 @@ contracts
 dist
 release
 *.zip
+*\dist_electron\*
+dist_electron

@@ -1,0 +1,121 @@
+/**app.wxss**/
+page {
+  height: 100%;
+  font-size: 28rpx;
+  line-height: 1.6;
+  background: #f0f2f5;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica,
+    Segoe UI, Arial, Roboto, 'PingFang SC', 'miui', 'Hiragino Sans GB', 'Microsoft Yahei',
+    sans-serif;
+}
+
+.container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 24rpx;
+}
+
+/* 通用样式 */
+.flex-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-around {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+
+/* 文本溢出省略号 */
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 卡片样式 */
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮样式 */
+.btn {
+  padding: 20rpx 32rpx;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #409eff;
+  color: #fff;
+}
+
+.btn-danger {
+  background: #f56c6c;
+  color: #fff;
+}
+
+/* 标签样式 */
+.tag {
+  padding: 4rpx 12rpx;
+  border-radius: 4rpx;
+  font-size: 24rpx;
+}
+
+.tag-success {
+  background: #f0f9eb;
+  color: #67c23a;
+  border: 1rpx solid #67c23a;
+}
+
+.tag-warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+  border: 1rpx solid #e6a23c;
+}
+
+.tag-danger {
+  background: #fef0f0;
+  color: #f56c6c;
+  border: 1rpx solid #f56c6c;
+}
+
+/* 加载状态 */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx 0;
+}
+
+.loading-text {
+  color: #909399;
+  font-size: 28rpx;
+  margin-left: 16rpx;
+} 

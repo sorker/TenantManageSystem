@@ -1,0 +1,91 @@
+.tenant-card {
+  background-color: #f0f9eb;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  transition: all 0.3s ease;
+  min-height: 180rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+}
+
+.tenant-card.overdue {
+  background-color: #fef0f0;
+}
+
+.tenant-card.paid {
+  background-color: #f0f9eb;
+}
+
+.tenant-card.empty {
+  background-color: #f4f4f5;
+}
+
+.tenant-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+.room-number {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #303133;
+}
+
+.payment-status {
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 20rpx;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.payment-status.overdue {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  border: 1rpx solid #f56c6c;
+}
+
+.payment-status.paid {
+  background-color: #f0f9eb;
+  color: #67c23a;
+  border: 1rpx solid #67c23a;
+}
+
+.payment-status.empty {
+  background-color: #f4f4f5;
+  color: #909399;
+  border: 1rpx solid #dcdfe6;
+}
+
+.tenant-card-body {
+  background-color: white;
+  border-radius: 8rpx;
+  padding: 12rpx;
+}
+
+.tenant-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+}
+
+.info-item .label {
+  color: #909399;
+  width: 80rpx;
+  flex-shrink: 0;
+}
+
+.info-item .value {
+  color: #303133;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+} 

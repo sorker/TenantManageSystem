@@ -1,0 +1,380 @@
+.container {
+  padding: 24rpx;
+  padding-bottom: 144rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 筛选区域 */
+.filter-section {
+  margin-bottom: 32rpx;
+}
+
+.filter-select {
+  width: 100%;
+  background: #fff;
+  padding: 20rpx;
+  border-radius: 8rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.1);
+}
+
+.picker {
+  color: #333;
+}
+
+/* 租客展示区域 */
+.tenant-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+}
+
+.location-block {
+  background-color: #f5f7fa;
+  border-radius: 16rpx;
+  padding: 32rpx;
+}
+
+.location-title {
+  margin: 0 0 32rpx 0;
+  font-size: 36rpx;
+  color: #303133;
+  font-weight: bold;
+}
+
+.floors-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.floor-section {
+  background-color: white;
+  border-radius: 12rpx;
+  padding: 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.tenants-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+  padding: 10rpx;
+}
+
+/* 底部地点选择栏 */
+.location-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  display: flex;
+  padding: 24rpx 32rpx;
+  gap: 24rpx;
+  box-shadow: 0 -2rpx 12rpx rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  border-top: 1rpx solid #ebeef5;
+}
+
+.location-tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: 30rpx;
+  color: #606266;
+  background-color: #f5f7fa;
+  border-radius: 16rpx;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1rpx solid #e4e7ed;
+  font-weight: 500;
+}
+
+.location-tab.active {
+  background-color: #409eff;
+  color: #fff;
+  border-color: #409eff;
+  box-shadow: 0 2rpx 8rpx rgba(64, 158, 255, 0.2);
+}
+
+/* 弹窗样式 */
+.dialog-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.dialog-content {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  z-index: 1001;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx;
+  border-bottom: 1rpx solid #ebeef5;
+}
+
+.dialog-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #303133;
+}
+
+.dialog-close {
+  font-size: 40rpx;
+  color: #909399;
+  padding: 0 20rpx;
+}
+
+/* 租客详情内容 */
+.tenant-detail-content {
+  padding: 32rpx;
+}
+
+.tenant-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.tenant-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+/* 标签页样式 */
+.tabs {
+  margin-top: 32rpx;
+}
+
+.tab-header {
+  display: flex;
+  border-bottom: 1rpx solid #ebeef5;
+}
+
+.tab-item {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  font-size: 28rpx;
+  color: #606266;
+  position: relative;
+}
+
+.tab-item.active {
+  color: #409eff;
+  font-weight: bold;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40rpx;
+  height: 4rpx;
+  background-color: #409eff;
+  border-radius: 2rpx;
+}
+
+.tab-content {
+  padding: 32rpx 0;
+}
+
+/* 缴费列表样式 */
+.payment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.payment-item {
+  background-color: #f5f7fa;
+  border-radius: 12rpx;
+  padding: 24rpx;
+  position: relative;
+}
+
+.payment-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.payment-date,
+.payment-amount,
+.payment-type,
+.payment-method {
+  font-size: 26rpx;
+  color: #606266;
+}
+
+.payment-amount {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.payment-notes {
+  font-size: 24rpx;
+  color: #909399;
+  margin-top: 8rpx;
+}
+
+.delete-btn {
+  position: absolute;
+  top: 24rpx;
+  right: 24rpx;
+  color: #f56c6c;
+  font-size: 24rpx;
+}
+
+/* 表单样式 */
+.payment-form {
+  padding: 32rpx;
+}
+
+.form-item {
+  margin-bottom: 32rpx;
+}
+
+.form-item .label {
+  display: block;
+  margin-bottom: 16rpx;
+  color: #606266;
+  font-size: 28rpx;
+}
+
+.form-item input,
+.form-item textarea,
+.form-item .picker {
+  width: 100%;
+  background-color: #f5f7fa;
+  border-radius: 8rpx;
+  padding: 20rpx;
+  font-size: 28rpx;
+  color: #303133;
+  box-sizing: border-box;
+}
+
+.form-item textarea {
+  height: 160rpx;
+}
+
+.monthly-rent-hint {
+  font-size: 24rpx;
+  color: #909399;
+  margin-top: 8rpx;
+}
+
+/* 弹窗底部按钮 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 24rpx;
+  padding: 32rpx;
+  border-top: 1rpx solid #ebeef5;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 64rpx 0;
+  color: #909399;
+  font-size: 28rpx;
+}
+
+/* 按钮样式 */
+.btn {
+  padding: 20rpx 32rpx;
+  border-radius: 8rpx;
+  font-size: 28rpx;
+  text-align: center;
+  background-color: #f5f7fa;
+  color: #606266;
+  border: none;
+}
+
+.btn-primary {
+  background-color: #409eff;
+  color: #fff;
+}
+
+/* 移动端适配 */
+@media screen and (max-width: 768px) {
+  .container {
+    padding: 16rpx;
+  }
+
+  .location-block {
+    padding: 24rpx;
+  }
+
+  .location-title {
+    font-size: 32rpx;
+    margin-bottom: 24rpx;
+  }
+
+  .tenants-list {
+    grid-template-columns: repeat(auto-fill, minmax(200rpx, 1fr));
+  }
+
+  .location-tabs {
+    padding: 20rpx 24rpx;
+    gap: 16rpx;
+  }
+
+  .location-tab {
+    font-size: 28rpx;
+    padding: 16rpx 0;
+  }
+}
+
+/* 小屏幕手机适配 */
+@media screen and (max-width: 375px) {
+  .tenants-list {
+    grid-template-columns: repeat(auto-fill, minmax(160rpx, 1fr));
+  }
+
+  .location-tab {
+    font-size: 26rpx;
+    padding: 14rpx 0;
+  }
+
+  .dialog-title {
+    font-size: 30rpx;
+  }
+
+  .form-item .label {
+    font-size: 26rpx;
+  }
+
+  .form-item input,
+  .form-item textarea,
+  .form-item .picker {
+    font-size: 26rpx;
+  }
+} 

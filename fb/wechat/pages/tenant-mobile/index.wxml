@@ -1,0 +1,213 @@
+<view class="container">
+  <!-- 筛选区域 -->
+  <view class="filter-section">
+    <picker 
+      mode="selector" 
+      range="{{uniqueFloors}}" 
+      value="{{selectedFloor}}" 
+      bindchange="onFloorChange"
+      class="filter-select"
+    >
+      <view class="picker">
+        {{selectedFloor || '选择楼层'}}
+      </view>
+    </picker>
+  </view>
+
+  <!-- 租客展示区域 -->
+  <view class="tenant-content" wx:if="{{!loading && uniqueLocations.length > 0}}">
+    <block wx:for="{{uniqueLocations}}" wx:key="*this" wx:for-item="location">
+      <view class="location-block" wx:if="{{!selectedLocation || selectedLocation === location}}">
+        <view class="location-title">{{location}}</view>
+        <view class="floors-container">
+          <block wx:for="{{getFloorsForLocation(location)}}" wx:key="*this" wx:for-item="floor">
+            <view class="floor-section">
+              <view class="tenants-list">
+                <block wx:for="{{getTenantsForLocationAndFloor(location, floor)}}" wx:key="id" wx:for-item="tenant">
+                  <tenant-card 
+                    tenant="{{tenant}}" 
+                    bind:cardTap="showTenantDetail"
+                  />
+                </block>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+    </block>
+  </view>
+  <view class="empty-state" wx:elif="{{!loading}}">
+    <text>暂无数据</text>
+  </view>
+
+  <!-- 底部地点选择栏 -->
+  <view class="location-tabs">
+    <view 
+      wx:for="{{uniqueLocations}}" 
+      wx:key="*this"
+      class="location-tab {{selectedLocation === item ? 'active' : ''}}"
+      bindtap="handleLocationTabClick"
+      data-location="{{item}}"
+    >
+      {{item}}
+    </view>
+  </view>
+
+  <!-- 租客详情弹窗 -->
+  <view class="tenant-detail-dialog" wx:if="{{tenantDetailVisible}}">
+    <view class="dialog-mask" bindtap="handleDialogClose"></view>
+    <view class="dialog-content">
+      <view class="dialog-header">
+        <text class="dialog-title">{{currentTenant.name}} 的详细信息</text>
+        <view class="dialog-close" bindtap="handleDialogClose">×</view>
+      </view>
+      
+      <view class="tenant-detail-content">
+        <view class="tenant-detail-header">
+          <view class="tenant-info">
+            <text>房间号：{{currentTenant.room_number}}</text>
+            <text>租金：{{currentTenant.rent_amount}}元/{{getPaymentFrequencyLabel(currentTenant.payment_frequency)}}</text>
+          </view>
+          <button class="btn btn-primary" bindtap="showAddPaymentDialog">新增缴费</button>
+        </view>
+        
+        <view class="tabs">
+          <view class="tab-header">
+            <view 
+              class="tab-item {{activeTab === 'payment' ? 'active' : ''}}" 
+              bindtap="switchTab" 
+              data-tab="payment"
+            >缴费历史</view>
+            <view 
+              class="tab-item {{activeTab === 'contract' ? 'active' : ''}}" 
+              bindtap="switchTab" 
+              data-tab="contract"
+            >合同信息</view>
+          </view>
+          
+          <view class="tab-content">
+            <view class="tab-pane" wx:if="{{activeTab === 'payment'}}">
+              <view class="payment-list">
+                <view class="payment-item" wx:for="{{currentPaymentHistory}}" wx:key="id">
+                  <view class="payment-info">
+                    <view class="payment-date">{{formatDate(item.payment_date)}}</view>
+                    <view class="payment-amount">{{item.amount}}元</view>
+                    <view class="payment-type">{{getPaymentTypeLabel(item.payment_type)}}</view>
+                    <view class="payment-method">{{getPaymentMethodLabel(item.payment_method)}}</view>
+                  </view>
+                  <view class="payment-notes" wx:if="{{item.notes}}">{{item.notes}}</view>
+                  <view 
+                    class="delete-btn" 
+                    wx:if="{{isLatestPaymentOfType(item)}}"
+                    bindtap="deletePaymentRecord"
+                    data-payment-id="{{item.id}}"
+                  >删除</view>
+                </view>
+              </view>
+            </view>
+            
+            <view class="tab-pane" wx:if="{{activeTab === 'contract'}}">
+              <view class="contract-info">
+                <view class="info-item">
+                  <text class="label">入住日期：</text>
+                  <text class="value">{{formatDate(currentTenant.check_in_date)}}</text>
+                </view>
+                <view class="info-item">
+                  <text class="label">合同状态：</text>
+                  <text class="value">{{currentTenant.is_active ? '有效' : '已终止'}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 新增缴费弹窗 -->
+  <view class="add-payment-dialog" wx:if="{{addPaymentVisible}}">
+    <view class="dialog-mask" bindtap="handleAddPaymentDialogClose"></view>
+    <view class="dialog-content">
+      <view class="dialog-header">
+        <text class="dialog-title">新增交租记录</text>
+        <view class="dialog-close" bindtap="handleAddPaymentDialogClose">×</view>
+      </view>
+      
+      <view class="payment-form">
+        <view class="form-item">
+          <text class="label">交租日期</text>
+          <picker 
+            mode="date" 
+            value="{{paymentForm.payment_date}}" 
+            bindchange="onPaymentDateChange"
+          >
+            <view class="picker">{{formatDate(paymentForm.payment_date)}}</view>
+          </picker>
+        </view>
+        
+        <view class="form-item">
+          <text class="label">费用类别</text>
+          <picker 
+            mode="selector" 
+            range="{{['租金', '水费', '电费', '维修费']}}" 
+            value="{{paymentForm.payment_type}}" 
+            bindchange="handlePaymentTypeChange"
+          >
+            <view class="picker">{{getPaymentTypeLabel(paymentForm.payment_type)}}</view>
+          </picker>
+        </view>
+        
+        <view class="form-item" wx:if="{{paymentForm.payment_type === 'rent'}}">
+          <text class="label">约定交租日期</text>
+          <picker 
+            mode="date" 
+            value="{{paymentForm.due_date}}" 
+            bindchange="onDueDateChange"
+          >
+            <view class="picker">{{formatDate(paymentForm.due_date)}}</view>
+          </picker>
+        </view>
+        
+        <view class="form-item">
+          <text class="label">金额</text>
+          <input 
+            type="digit" 
+            value="{{paymentForm.amount}}"
+            bindinput="onAmountChange"
+            placeholder="请输入金额"
+          />
+          <text class="monthly-rent-hint" wx:if="{{paymentForm.payment_type === 'rent'}}">
+            (月租:¥{{currentTenant.rent_amount}})
+          </text>
+        </view>
+        
+        <view class="form-item">
+          <text class="label">支付方式</text>
+          <picker 
+            mode="selector" 
+            range="{{['现金', '微信', '支付宝', '银行转账']}}" 
+            value="{{paymentForm.payment_method}}" 
+            bindchange="onPaymentMethodChange"
+          >
+            <view class="picker">{{getPaymentMethodLabel(paymentForm.payment_method)}}</view>
+          </picker>
+        </view>
+        
+        <view class="form-item">
+          <text class="label">备注</text>
+          <textarea 
+            value="{{paymentForm.notes}}"
+            bindinput="onNotesChange"
+            placeholder="请输入备注"
+            maxlength="200"
+          />
+        </view>
+      </view>
+      
+      <view class="dialog-footer">
+        <button class="btn" bindtap="handleAddPaymentDialogClose">取消</button>
+        <button class="btn btn-primary" bindtap="submitPayment">确定</button>
+      </view>
+    </view>
+  </view>
+</view> 
