@@ -16,3 +16,7 @@ release
 *.zip
 *\dist_electron\*
 dist_electron
+
+# 微信小程序配置
+fb/wechat/project.config.json
+fb/wechat/project.private.config.json

@@ -6,7 +6,7 @@ import PrintPaymentHistory from '../views/PrintPaymentHistory.vue';
 const routes = [
   {
     path: '/',
-    redirect: '/tenants'
+    redirect: '/mobile'
   },
   {
     path: '/tenants',

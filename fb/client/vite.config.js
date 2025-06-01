@@ -25,8 +25,8 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true,
-        drop_debugger: true
+        drop_console: false,
+        drop_debugger: false
       }
     },
     rollupOptions: {
@@ -41,11 +41,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     outDir: 'dist',
     assetsDir: 'assets',
-    emptyOutDir: true
+    emptyOutDir: true,
+    sourcemap: true,
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true
+    }
   },
   server: {
-    port: 3001,
-    open: true,
+    port: 5173,
+    open: false,
     cors: true,
     proxy: {
       '/api': {
@@ -87,6 +92,9 @@ export default defineConfig({
       'element-plus',
       'echarts',
       'axios'
-    ]
+    ],
+    esbuildOptions: {
+      target: 'es2015'
+    }
   }
 }); 

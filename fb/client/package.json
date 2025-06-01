@@ -13,8 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
     "format": "prettier --write src/",
-    "electron:dev": "cross-env NODE_ENV=development vite build --watch & electron .",
-    "electron:build": "cross-env NODE_ENV=production ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true ELECTRON_BUILDER_USE_HARD_LINKS=false ELECTRON_BUILDER_USE_SYMLINKS=false ELECTRON_BUILDER_CACHE=./electron-builder-cache ELECTRON_BUILDER_CACHE_DIR=./electron-builder-cache ELECTRON_BUILDER_APP_UPDATE_ENABLED=false ELECTRON_BUILDER_SIGNING_ENABLED=false vite build && electron-builder",
+    "electron:dev": "concurrently -k \"cross-env NODE_ENV=development vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "cross-env NODE_ENV=production ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES=true ELECTRON_BUILDER_USE_HARD_LINKS=false ELECTRON_BUILDER_USE_SYMLINKS=false ELECTRON_BUILDER_CACHE=./electron-builder-cache ELECTRON_BUILDER_CACHE_DIR=./electron-builder-cache vite build && electron-builder",
     "electron:preview": "cross-env NODE_ENV=production electron ."
   },
   "dependencies": {
@@ -31,6 +31,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.2.3",
     "@vue/test-utils": "^2.4.1",
+    "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
     "electron": "^36.3.2",
     "electron-builder": "^26.0.12",
@@ -41,7 +42,8 @@
     "rollup-plugin-visualizer": "^6.0.0",
     "sass": "^1.66.1",
     "vite": "^4.4.9",
-    "vitest": "^0.34.4"
+    "vitest": "^0.34.4",
+    "wait-on": "^8.0.3"
   },
   "build": {
     "appId": "com.tenant.management",
@@ -52,7 +54,9 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "package.json",
+      "node_modules/**/*"
     ],
     "win": {
       "target": [
@@ -91,7 +95,7 @@
       "provider": "generic",
       "url": "https://your-update-server.com/updates/"
     },
-    "asar": true,
+    "asar": false,
     "asarUnpack": [
       "node_modules/7zip-bin/**/*"
     ],
