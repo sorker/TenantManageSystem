@@ -37,6 +37,7 @@ function createWindow() {
   if (isDev) {
     log.info('开发模式：等待 Vite 开发服务器启动...')
     mainWindow.loadURL('http://localhost:5173')
+    // 仅在开发模式下打开开发者工具
     mainWindow.webContents.openDevTools()
   } else {
     // 检查文件是否存在

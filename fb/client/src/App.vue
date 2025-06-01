@@ -38,7 +38,7 @@
           <el-icon><TrendCharts /></el-icon>
           <template #title>数据统计</template>
         </el-menu-item>
-        <el-menu-item index="/database">
+        <el-menu-item index="/database" v-if="isDev">
           <el-icon><DataLine /></el-icon>
           <template #title>数据库查看</template>
         </el-menu-item>
@@ -83,11 +83,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { User, House, Tools, Calendar, DataLine, Location, TrendCharts, Fold, Expand, Menu } from '@element-plus/icons-vue'
 
 const isCollapse = ref(false)
 const isDark = ref(false)
+const isDev = computed(() => process.env.NODE_ENV === 'development')
 
 const toggleSidebar = () => {
   isCollapse.value = !isCollapse.value

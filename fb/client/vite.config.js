@@ -79,6 +79,7 @@ export default defineConfig({
     }
   },
   define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
     'process.env.API_BASE_URL': JSON.stringify(process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : 'http://127.0.0.1:8000')
   },
   css: {
