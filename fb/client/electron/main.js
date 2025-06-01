@@ -11,6 +11,9 @@ log.info('当前工作目录:', process.cwd())
 log.info('__dirname:', __dirname)
 log.info('NODE_ENV:', process.env.NODE_ENV)
 
+// API 配置
+const API_BASE_URL = isDev ? 'http://localhost:8000' : 'http://127.0.0.1:8000'
+
 let mainWindow = null
 
 function createWindow() {
@@ -23,7 +26,10 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      sandbox: true
     }
   })
 
@@ -53,10 +59,14 @@ function createWindow() {
       log.error('index.html 文件不存在')
       dialog.showErrorBox('错误', '找不到主页面文件')
     }
-    
-    // 打开开发者工具以便调试
-    mainWindow.webContents.openDevTools()
   }
+
+  // 注入 API 基础 URL
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.executeJavaScript(`
+      window.API_BASE_URL = "${API_BASE_URL}";
+    `)
+  })
 
   // 添加页面加载事件监听
   mainWindow.webContents.on('did-start-loading', () => {
@@ -152,11 +162,15 @@ process.on('uncaughtException', (error) => {
 app.whenReady().then(() => {
   createWindow()
 
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
   })
 })
 
-app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') app.quit()
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
 })

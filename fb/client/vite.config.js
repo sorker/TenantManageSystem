@@ -32,9 +32,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          'vue-core': ['vue'],
+          'vue-runtime': ['vue-router', 'pinia'],
           'element-plus': ['element-plus'],
-          'echarts': ['echarts'],
-          'vue': ['vue', 'vue-router', 'pinia']
+          'echarts': ['echarts']
         }
       }
     },
@@ -76,6 +77,9 @@ export default defineConfig({
       'Pragma': 'no-cache',
       'Expires': '0'
     }
+  },
+  define: {
+    'process.env.API_BASE_URL': JSON.stringify(process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : 'http://127.0.0.1:8000')
   },
   css: {
     preprocessorOptions: {
