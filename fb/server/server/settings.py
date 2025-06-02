@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+from .config import API_CONFIG, CORS_CONFIG, APP_CONFIG
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,10 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(k*@p42=mt(of^-zozs9^vx&+7)$#g7g+fv!5sctfvax#!tc9-'
+SECRET_KEY = APP_CONFIG['SECRET_KEY']
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = APP_CONFIG['DEBUG']
 
 ALLOWED_HOSTS = ['*']
 
@@ -139,29 +140,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS 配置
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-CORS_ALLOWED_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOWED_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
+CORS_ALLOWED_ORIGINS = CORS_CONFIG['ALLOWED_ORIGINS']
+CORS_ALLOWED_METHODS = CORS_CONFIG['ALLOWED_METHODS']
+CORS_ALLOWED_HEADERS = CORS_CONFIG['ALLOWED_HEADERS']
 
 # 日志配置
 LOGGING = {
