@@ -17,6 +17,34 @@ release
 *\dist_electron\*
 dist_electron
 
+# 服务器配置
+fb/server/server/config.py
+fb/server/.env
+fb/server/*.pyc
+fb/server/__pycache__/
+
+# 客户端配置
+fb/client/src/config/index.js
+fb/client/.env
+fb/client/.env.*
+
 # 微信小程序配置
 fb/wechat/project.config.json
 fb/wechat/project.private.config.json
+fb/wechat/config/index.js
+fb/wechat/.env
+fb/wechat/.env.*
+
+# 数据库备份
+*.db
+*.db.bac
+*.sqlite
+*.sqlite3
+
+# 其他敏感文件
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx

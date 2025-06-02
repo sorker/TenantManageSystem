@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 import viteCompression from 'vite-plugin-compression';
+import { API_CONFIG } from './src/config';
 
 export default defineConfig({
   plugins: [
@@ -55,7 +56,7 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: API_CONFIG.BASE_URL,
         changeOrigin: true,
         secure: false,
         rewrite: path => path.replace(/\/api\/database\/tables$/, '/api/database/tables/'),
@@ -80,7 +81,7 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
-    'process.env.API_BASE_URL': JSON.stringify(process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : 'http://127.0.0.1:8000')
+    'process.env.API_BASE_URL': JSON.stringify(API_CONFIG.BASE_URL)
   },
   css: {
     preprocessorOptions: {

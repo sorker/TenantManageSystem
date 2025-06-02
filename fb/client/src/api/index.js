@@ -1,32 +1,22 @@
 import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_CONFIG } from '../config';
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 5000,
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT,
+  headers: API_CONFIG.HEADERS
 });
 
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
     // 打印请求信息
-    console.log('Request URL before:', config.url);
-    console.log('Request Method:', config.method);
-    console.log('Request Data:', config.data);
     
     // 确保URL以斜杠结尾
     if (config.url && !config.url.endsWith('/')) {
       config.url = `${config.url}/`;
     }
-    
-    // 打印修改后的URL
-    console.log('Request URL after:', config.url);
-    
+        
     // 从 localStorage 获取 token
     const token = localStorage.getItem('token');
     if (token) {

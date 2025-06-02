@@ -3,6 +3,7 @@ const path = require('path')
 const fs = require('fs')
 const isDev = process.env.NODE_ENV === 'development'
 const log = require('electron-log')
+const { API_CONFIG, APP_CONFIG } = require('../src/config')
 
 // 配置日志
 log.transports.file.level = 'debug'
@@ -11,8 +12,8 @@ log.info('当前工作目录:', process.cwd())
 log.info('__dirname:', __dirname)
 log.info('NODE_ENV:', process.env.NODE_ENV)
 
-// API 配置
-const API_BASE_URL = isDev ? 'http://localhost:8000' : 'http://127.0.0.1:8000'
+// 从环境变量获取API地址
+const API_BASE_URL = process.env.API_BASE_URL || API_CONFIG.BASE_URL
 
 let mainWindow = null
 
@@ -66,6 +67,7 @@ function createWindow() {
   mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.webContents.executeJavaScript(`
       window.API_BASE_URL = "${API_BASE_URL}";
+      window.APP_CONFIG = ${JSON.stringify(APP_CONFIG)};
     `)
   })
 

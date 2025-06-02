@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_CONFIG } from '../config';
 
 // 获取 API 基础 URL
 const getBaseURL = () => {
@@ -10,17 +11,15 @@ const getBaseURL = () => {
   if (process.env.API_BASE_URL) {
     return process.env.API_BASE_URL;
   }
-  // 默认值
-  return 'http://127.0.0.1:8000';
+  // 最后使用配置文件中的默认值
+  return API_CONFIG.BASE_URL;
 };
 
 // 创建 axios 实例
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  timeout: API_CONFIG.TIMEOUT,
+  headers: API_CONFIG.HEADERS
 });
 
 // 请求拦截器
