@@ -33,7 +33,6 @@ Page({
     // 检查网络状态
     wx.getNetworkType({
       success: (res) => {
-        console.log('当前网络类型:', res.networkType)
         if (res.networkType === 'none') {
           wx.showToast({
             title: '请检查网络连接',
@@ -61,9 +60,6 @@ Page({
     
     this.setData({ loading: true })
     try {
-      console.log('开始加载租客数据')
-      console.log('当前baseUrl:', app.globalData.baseUrl)
-      
       // 使用测试数据
       const mockRooms = [
         {
@@ -168,16 +164,12 @@ Page({
       // 获取所有唯一的楼层
       const uniqueFloors = Array.from(new Set(rooms.map(r => r.floor))).filter(Boolean).sort();
 
-      console.log('处理后的房间数据:', rooms);
-      console.log('唯一地点:', uniqueLocations);
-      console.log('唯一楼层:', uniqueFloors);
 
       // 处理数据
       const tenantsData = {};
       for (const location of uniqueLocations) {
         for (const floor of this.getFloorsForLocation(location, rooms)) {
           const key = `${location}-${floor}`;
-          console.log('处理地点和楼层:', location, floor, 'key:', key);
           
           // 获取该楼层的租客
           const floorTenants = rooms.filter(r => 
@@ -193,7 +185,6 @@ Page({
             };
           }).sort((a, b) => a.room_number.localeCompare(b.room_number));
 
-          console.log('该楼层的租客:', floorTenants);
 
           // 获取该楼层的所有房间
           const floorRooms = rooms.filter(r => 
@@ -201,7 +192,6 @@ Page({
             r.floor === floor
           );
 
-          console.log('该楼层的房间:', floorRooms);
 
           // 创建包含所有房间的数组
           const allRooms = floorRooms.map(room => {
@@ -229,11 +219,9 @@ Page({
             a.room_number.localeCompare(b.room_number)
           );
 
-          console.log('最终处理的数据:', key, tenantsData[key]);
         }
       }
 
-      console.log('所有处理后的数据:', tenantsData);
 
       // 确保数据更新前进行验证
       if (!rooms || !uniqueLocations || !uniqueFloors || !tenantsData) {
@@ -247,7 +235,6 @@ Page({
         tenantsData,
         loading: false
       }, () => {
-        console.log('数据更新完成，当前数据:', this.data);
       });
     } catch (error) {
       console.error('加载数据失败，详细错误:', error);
@@ -263,7 +250,6 @@ Page({
   // 获取房间数据
   async fetchRooms() {
     try {
-      console.log('开始获取房间数据，URL:', `${app.globalData.baseUrl}api/rooms/`)
       const res = await new Promise((resolve, reject) => {
         wx.request({
           url: `${app.globalData.baseUrl}api/rooms/`,
@@ -273,7 +259,6 @@ Page({
             'Accept': 'application/json'
           },
           success: (res) => {
-            console.log('请求成功，响应数据:', res)
             if (res && res.data) {
               resolve(res.data)
             } else {
@@ -304,7 +289,6 @@ Page({
   // 获取租客数据
   async fetchTenants() {
     try {
-      console.log('开始获取租客数据，URL:', `${app.globalData.baseUrl}api/tenants/`)
       const res = await new Promise((resolve, reject) => {
         wx.request({
           url: `${app.globalData.baseUrl}api/tenants/`,
@@ -314,7 +298,6 @@ Page({
             'Accept': 'application/json'
           },
           success: (res) => {
-            console.log('请求成功，响应数据:', res)
             if (res && res.data) {
               resolve(res.data)
             } else {
@@ -326,7 +309,7 @@ Page({
             reject(err)
           },
           complete: () => {
-            console.log('请求完成')
+            '请求完成')
           }
         })
       })

@@ -24,7 +24,6 @@ if (!fs.existsSync(contractsDir)) {
 // 监听数据库初始化完成事件
 db.on('open', async () => {
   isDatabaseReady = true;
-  console.log('Database and tables are ready for queries');
 });
 
 // 监听数据库错误
@@ -49,8 +48,6 @@ function getPreloadPath() {
 
 function createWindow() {
   const preloadPath = getPreloadPath();
-  console.log('Using preload script at:', preloadPath);
-
   // 验证 preload 脚本是否存在
   try {
     if (fs.existsSync(preloadPath)) {
@@ -90,13 +87,10 @@ function createWindow() {
   const isDev = process.env.NODE_ENV === 'development';
 
   if (isDev) {
-    console.log('Running in development mode');
-    console.log('Preload script path:', path.join(__dirname, 'preload.js'));
     // 开发模式：加载 Vite 开发服务器
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    console.log('Running in production mode');
     // 生产模式：加载打包后的文件
     mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
     // 在生产模式下也打开开发者工具，用于调试
@@ -118,7 +112,6 @@ app.whenReady().then(async () => {
   try {
     // 初始化数据库连接
     await db.connect();
-    console.log('Database connection initialized');
   } catch (error) {
     console.error('Failed to initialize database:', error);
   }
@@ -157,7 +150,6 @@ ipcMain.handle('get-all-tables', async () => {
           console.error('Error getting tables:', err);
           reject(new Error(`Failed to get tables: ${err.message}`));
         } else {
-          console.log('Tables found:', tables);
           resolve(tables.map(t => t.name));
         }
       });
@@ -192,7 +184,6 @@ ipcMain.handle('get-table-data', async (event, tableName) => {
           console.error('Error getting table data:', err);
           reject(new Error(`Failed to get table data: ${err.message}`));
         } else {
-          console.log(`Data found for table ${tableName}:`, rows.length, 'rows');
           resolve(rows);
         }
       });
@@ -226,7 +217,6 @@ ipcMain.handle('get-table-schema', async (event, tableName) => {
         console.error('Error getting table schema:', err);
         reject(new Error('Failed to get table schema: ' + err.message));
       } else {
-        console.log('Schema found for table ' + tableName + ':', columns);
         resolve(columns);
       }
     });

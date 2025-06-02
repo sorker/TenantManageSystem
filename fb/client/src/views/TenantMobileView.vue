@@ -35,7 +35,7 @@
                           'paid': !tenant.isOverdue,
                           'empty': tenant.is_empty 
                         }"
-                        @click="tenant.is_empty ? null : showTenantDetail(tenant)"
+                        @click="tenant.is_empty ? showAddTenantDialog(tenant) : showTenantDetail(tenant)"
                       >
                         <div class="tenant-card-header">
                           <div class="room-number">{{ tenant.room_number }}</div>
@@ -237,9 +237,89 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="addPaymentVisible = false">取消</el-button>
-          <el-button type="primary" @click="submitPayment">
-            确定
+          <el-button @click="addPaymentVisible = false" :disabled="submitting">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitPayment"
+            :loading="submitting"
+            :disabled="submitting"
+          >
+            {{ submitting ? '提交中...' : '确定' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 添加租客对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEditing ? '编辑租客' : '新增租客'"
+      width="100%"
+      class="tenant-dialog"
+    >
+      <el-form
+        ref="formRef"
+        :model="tenantForm"
+        :rules="rules"
+        label-width="100px"
+      >
+        <el-form-item label="姓名" prop="name">
+          <el-input v-model="tenantForm.name" />
+        </el-form-item>
+        <el-form-item label="电话" prop="phone">
+          <el-input v-model="tenantForm.phone" />
+        </el-form-item>
+        <el-form-item label="身份证号" prop="id_number">
+          <el-input v-model="tenantForm.id_number" />
+        </el-form-item>
+        <el-form-item label="微信号" prop="wechat_id">
+          <el-input v-model="tenantForm.wechat_id" />
+        </el-form-item>
+        <el-form-item label="入住时间" prop="check_in_date">
+          <el-date-picker
+            v-model="tenantForm.check_in_date"
+            type="date"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="租金" prop="rent_amount">
+          <el-input-number 
+            v-model="tenantForm.rent_amount" 
+            :min="0" 
+            :precision="2"
+            :step="100"
+            style="width: 100%"
+            @change="handleRentAmountChange"
+          />
+        </el-form-item>
+        <el-form-item label="交租方式" prop="payment_frequency">
+          <el-select v-model="tenantForm.payment_frequency" style="width: 100%">
+            <el-option label="按月" value="monthly" />
+            <el-option label="按半年" value="semi_annual" />
+            <el-option label="按季" value="quarterly" />
+            <el-option label="按年" value="yearly" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="最后交租日期" prop="last_payment_date">
+          <el-date-picker
+            v-model="tenantForm.last_payment_date"
+            type="date"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false" :disabled="submitting">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitTenantForm"
+            :loading="submitting"
+            :disabled="submitting"
+          >
+            {{ submitting ? '提交中...' : '确定' }}
           </el-button>
         </span>
       </template>
@@ -251,6 +331,8 @@
 import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue';
 import { useTenantStore } from '../stores/tenant';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useRoomStore } from '../stores/room';
+import { useLocationStore } from '../stores/location';
 
 const store = useTenantStore();
 const selectedLocation = ref('');
@@ -311,18 +393,23 @@ const getTenantsForLocationAndFloor = (location, floor) => {
 
   // 创建包含所有房间的数组
   const allRooms = floorRooms.map(room => {
-    // 查找是否有租客住在这个房间
-    const tenant = tenants.find(t => t.room === room.id);
+    // 查找该房间的所有租客，并按入住日期降序排序
+    const roomTenants = tenants
+      .filter(t => t.room === room.id)
+      .sort((a, b) => new Date(b.check_in_date) - new Date(a.check_in_date));
     
-    if (tenant) {
-      // 如果有租客，返回租客信息
+    // 获取当前在租的租客（第一个活跃的租客）
+    const activeTenant = roomTenants.find(t => t.is_active);
+    
+    if (activeTenant) {
+      // 如果有活跃租客，返回租客信息
       return {
-        ...tenant,
-        statusText: getPaymentStatusText(tenant),
-        isOverdue: isTenantOverdue(tenant)
+        ...activeTenant,
+        statusText: getPaymentStatusText(activeTenant),
+        isOverdue: isTenantOverdue(activeTenant)
       };
     } else {
-      // 如果没有租客，返回空房间信息
+      // 如果没有活跃租客，返回空房间信息
       return {
         id: `empty-${room.id}`,
         room_number: room.room_number,
@@ -460,6 +547,7 @@ const currentTenant = ref(null);
 const currentPaymentHistory = ref([]);
 const paymentFormRef = ref(null);
 const activeTab = ref('payment');
+const submitting = ref(false);
 
 const paymentForm = ref({
   payment_date: new Date(),
@@ -606,9 +694,10 @@ const handlePaymentTypeChange = (value) => {
 
 // 提交缴费
 const submitPayment = async () => {
-  if (!paymentFormRef.value || !currentTenant.value) return;
+  if (!paymentFormRef.value || !currentTenant.value || submitting.value) return;
   
   try {
+    submitting.value = true;
     await paymentFormRef.value.validate();
     const paymentData = {
       ...paymentForm.value,
@@ -641,9 +730,19 @@ const submitPayment = async () => {
     await loadTenantsData();
     
     // 重新获取当前租客的最新数据
-    const updatedTenant = await store.fetchTenants();
-    currentTenant.value = updatedTenant.find(t => t.id === currentTenant.value.id);
-    currentPaymentHistory.value = currentTenant.value.payment_history;
+    const updatedTenants = await store.fetchTenants();
+    if (!updatedTenants) {
+      throw new Error('获取租客数据失败');
+    }
+    
+    const updatedTenant = updatedTenants.find(t => t.id === currentTenant.value.id);
+    if (!updatedTenant) {
+      throw new Error('未找到更新后的租客数据');
+    }
+    
+    currentTenant.value = updatedTenant;
+    currentPaymentHistory.value = updatedTenant.payment_history || [];
+    
   } catch (error) {
     if (error === 'cancel') return;
     console.error('缴费失败:', error);
@@ -653,6 +752,8 @@ const submitPayment = async () => {
       console.error('错误状态码:', error.response.status);
     }
     ElMessage.error(error.response?.data?.message || error.message || '缴费失败');
+  } finally {
+    submitting.value = false;
   }
 };
 
@@ -790,6 +891,115 @@ const handleLocationTabClick = (location) => {
     // 否则选中新的tab
     selectedLocation.value = location;
   }
+};
+
+// 添加新的状态变量
+const dialogVisible = ref(false);
+const isEditing = ref(false);
+const formRef = ref(null);
+const roomStore = useRoomStore();
+const locationStore = useLocationStore();
+
+// 租客表单数据
+const tenantForm = ref({
+  name: '',
+  phone: '',
+  id_number: '',
+  wechat_id: '',
+  check_in_date: new Date(),
+  rent_amount: 0,
+  payment_frequency: 'monthly',
+  last_payment_date: null,
+  is_active: true
+});
+
+// 表单验证规则
+const rules = {
+  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ],
+  id_number: [
+    { required: true, message: '请输入身份证号', trigger: 'blur' },
+    { pattern: /(^\d{15}$)|(^\d{18}$)|(^\d{17}(\d|X|x)$)/, message: '请输入正确的身份证号', trigger: 'blur' }
+  ],
+  check_in_date: [{ required: true, message: '请选择入住时间', trigger: 'change' }],
+  rent_amount: [{ required: true, message: '请输入租金', trigger: 'blur' }],
+  payment_frequency: [{ required: true, message: '请选择交租方式', trigger: 'change' }]
+};
+
+// 显示新增租客对话框
+const showAddTenantDialog = async (emptyRoom) => {
+  try {
+    isEditing.value = false;
+    submitting.value = false;
+    
+    // 重置表单
+    tenantForm.value = {
+      name: '',
+      phone: '',
+      id_number: '',
+      wechat_id: '',
+      check_in_date: new Date(),
+      rent_amount: 0,
+      payment_frequency: 'monthly',
+      last_payment_date: null,
+      is_active: true
+    };
+    
+    // 获取房间信息
+    const room = rooms.value.find(r => r.room_number === emptyRoom.room_number);
+    if (!room) {
+      ElMessage.error('未找到房间信息');
+      return;
+    }
+    
+    // 设置房间信息
+    tenantForm.value.room = room.id;
+    
+    dialogVisible.value = true;
+  } catch (error) {
+    console.error('打开新增租客对话框失败:', error);
+    ElMessage.error('打开新增租客对话框失败');
+  }
+};
+
+// 提交租客表单
+const submitTenantForm = async () => {
+  if (!formRef.value) return;
+  
+  try {
+    submitting.value = true;
+    await formRef.value.validate();
+    
+    // 格式化数据
+    const formData = {
+      ...tenantForm.value,
+      check_in_date: tenantForm.value.check_in_date ? 
+        new Date(tenantForm.value.check_in_date).toISOString().split('T')[0] : null,
+      last_payment_date: tenantForm.value.last_payment_date ? 
+        new Date(tenantForm.value.last_payment_date).toISOString().split('T')[0] : null
+    };
+
+    await store.addTenant(formData);
+    ElMessage.success('添加成功');
+    dialogVisible.value = false;
+    
+    // 重新加载数据
+    await loadTenantsData();
+  } catch (error) {
+    if (error === 'cancel') return;
+    console.error('添加租客失败:', error);
+    ElMessage.error(error.message || '添加租客失败');
+  } finally {
+    submitting.value = false;
+  }
+};
+
+// 处理租金金额变化
+const handleRentAmountChange = (value) => {
+  tenantForm.value.rent_amount = Number(value);
 };
 </script>
 
@@ -1135,5 +1345,33 @@ const handleLocationTabClick = (location) => {
   .floor-section {
     padding: 4px;
   }
+}
+
+.tenant-dialog :deep(.el-dialog) {
+  margin: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-height: 90vh;
+  border-radius: 16px 16px 0 0;
+}
+
+.tenant-dialog :deep(.el-dialog__body) {
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.tenant-dialog :deep(.el-form-item__content) {
+  flex-wrap: nowrap;
+  margin-left: 0 !important;
+}
+
+.tenant-dialog :deep(.el-form-item__label) {
+  width: 100px !important;
+  text-align: right;
+  padding-right: 12px;
 }
 </style> 
