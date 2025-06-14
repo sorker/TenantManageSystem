@@ -3,7 +3,6 @@ const path = require('path')
 const fs = require('fs')
 const isDev = process.env.NODE_ENV === 'development'
 const log = require('electron-log')
-const { API_CONFIG, APP_CONFIG } = require('../src/config')
 
 // 配置日志
 log.transports.file.level = 'debug'
@@ -11,6 +10,59 @@ log.info('应用启动')
 log.info('当前工作目录:', process.cwd())
 log.info('__dirname:', __dirname)
 log.info('NODE_ENV:', process.env.NODE_ENV)
+
+// 根据环境确定配置文件路径
+let configPath
+if (isDev) {
+  configPath = path.join(__dirname, '../src/config/config.cjs')
+} else {
+  // 在生产环境中，配置文件会被复制到 resources 目录
+  const resourcesPath = process.platform === 'darwin'
+    ? path.join(process.resourcesPath, 'config')
+    : path.join(process.resourcesPath, 'config')
+  configPath = path.join(resourcesPath, 'config.cjs')
+}
+
+log.info('尝试加载配置文件路径:', configPath)
+
+// 检查配置文件是否存在
+if (fs.existsSync(configPath)) {
+  log.info('配置文件存在')
+  try {
+    const stats = fs.statSync(configPath)
+    log.info('配置文件大小:', stats.size, '字节')
+  } catch (err) {
+    log.error('读取配置文件信息失败:', err)
+  }
+} else {
+  log.error('配置文件不存在')
+  // 列出目录内容以帮助调试
+  try {
+    const dirPath = path.dirname(configPath)
+    if (fs.existsSync(dirPath)) {
+      log.info('目录内容:', fs.readdirSync(dirPath))
+    } else {
+      log.error('目录不存在:', dirPath)
+    }
+  } catch (err) {
+    log.error('读取目录失败:', err)
+  }
+}
+
+// 动态导入配置
+let API_CONFIG, APP_CONFIG
+try {
+  const config = require(configPath)
+  log.info('配置文件内容:', config)
+  API_CONFIG = config.API_CONFIG
+  APP_CONFIG = config.APP_CONFIG
+  log.info('成功加载配置文件')
+} catch (error) {
+  log.error('加载配置文件失败:', error)
+  log.error('错误堆栈:', error.stack)
+  dialog.showErrorBox('错误', '无法加载配置文件，应用将退出。')
+  app.quit()
+}
 
 // 从环境变量获取API地址
 const API_BASE_URL = process.env.API_BASE_URL || API_CONFIG.BASE_URL

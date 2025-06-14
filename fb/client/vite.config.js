@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { resolve } from 'path';
 import viteCompression from 'vite-plugin-compression';
-import { API_CONFIG } from './src/config';
+import { API_CONFIG } from './src/config/index.js';
 
 export default defineConfig({
   plugins: [

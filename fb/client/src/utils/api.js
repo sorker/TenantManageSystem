@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_CONFIG } from '../config';
+import { API_CONFIG } from '../config/index.js';
 
 // 获取 API 基础 URL
 const getBaseURL = () => {

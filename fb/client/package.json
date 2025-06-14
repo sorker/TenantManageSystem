@@ -55,6 +55,7 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
+      "src/config/**/*",
       "package.json",
       "node_modules/**/*"
     ],
@@ -100,6 +101,10 @@
       "node_modules/7zip-bin/**/*"
     ],
     "extraResources": [
+      {
+        "from": "src/config",
+        "to": "config"
+      },
       {
         "from": "node_modules/7zip-bin/win/x64/7za.exe",
         "to": "7zip-bin/win/x64/7za.exe"
