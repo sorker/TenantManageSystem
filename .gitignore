@@ -25,6 +25,7 @@ fb/server/__pycache__/
 
 # 客户端配置
 fb/client/src/config/index.js
+fb/client/src/config/config.cjs
 fb/client/.env
 fb/client/.env.*
 
